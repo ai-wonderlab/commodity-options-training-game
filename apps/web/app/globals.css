@@ -89,15 +89,50 @@
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
   
   body {
-    @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
     font-feature-settings: "rlig" 1, "calt" 1;
+    font-family: 'Manrope', system-ui, sans-serif;
   }
   
   h1, h2, h3, h4, h5, h6 {
-    @apply font-serif;
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 700;
   }
 }
+
+/* Additional global styles */
+.bg-background { background-color: hsl(var(--background)) !important; }
+.text-foreground { color: hsl(var(--foreground)) !important; }
+.bg-card { background-color: hsl(var(--card)) !important; }
+.border-border { border-color: hsl(var(--border)) !important; }
+.bg-primary { background-color: hsl(var(--primary)) !important; }
+.text-primary { color: hsl(var(--primary)) !important; }
+.bg-success { background-color: hsl(var(--success)) !important; }
+.text-success { color: hsl(var(--success)) !important; }
+.bg-destructive { background-color: hsl(var(--destructive)) !important; }
+.text-destructive { color: hsl(var(--destructive)) !important; }
+.bg-muted { background-color: hsl(var(--muted)) !important; }
+.text-muted-foreground { color: hsl(var(--muted-foreground)) !important; }
+
+/* Font sizes */
+.text-h1 { font-size: clamp(2.5rem, 5vw, 4rem); line-height: 1.1; font-weight: 900; }
+.text-h2 { font-size: clamp(2rem, 4vw, 3rem); line-height: 1.2; font-weight: 800; }
+.text-h3 { font-size: clamp(1.5rem, 3vw, 2rem); line-height: 1.3; font-weight: 700; }
+.text-h4 { font-size: clamp(1.25rem, 2.5vw, 1.5rem); line-height: 1.4; font-weight: 600; }
+.text-body { font-size: 1rem; line-height: 1.6; }
+.text-small { font-size: 0.875rem; line-height: 1.5; }
+.text-caption { font-size: 0.75rem; line-height: 1.4; }
+
+/* Shadows */
+.shadow-soft { box-shadow: 0 2px 8px 0 rgb(0 0 0 / 0.05) !important; }
+.shadow-medium { box-shadow: 0 4px 16px 0 rgb(0 0 0 / 0.08) !important; }
+.shadow-hard { box-shadow: 0 8px 24px 0 rgb(0 0 0 / 0.12) !important; }
+
+/* Font families */
+.font-sans { font-family: 'Manrope', system-ui, sans-serif !important; }
+.font-serif { font-family: 'Fraunces', Georgia, serif !important; }
