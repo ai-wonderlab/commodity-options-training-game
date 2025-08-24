@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from '../components/AuthProvider';
 import AuthButton from '../components/AuthButton';
 import QuickNav from '../components/QuickNav';
+import ComplianceBanner from '../components/ComplianceBanner';
 
 export const metadata = {
   title: 'Commodity Options Training Game - ICE Brent',
@@ -16,17 +17,17 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <body className="min-h-screen bg-background text-foreground font-sans">
         <AuthProvider>
           <div className="min-h-screen flex flex-col">
-            <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+            <header className="bg-card border-b border-border sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-card/95">
               <div className="max-w-screen-2xl mx-auto px-4 py-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                    <h1 className="text-h4 font-serif font-bold text-foreground">
                       Commodity Options Training Game
                     </h1>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-caption text-muted-foreground">
                       Education only • ICE Brent (BRN) & Options (BUL) • 15-min delayed • EU region only
                     </p>
                   </div>
@@ -36,7 +37,7 @@ export default function RootLayout({
                 </div>
               </div>
             </header>
-            <main className="flex-1">
+            <main className="flex-1 bg-background">
               {children}
             </main>
           </div>
@@ -45,12 +46,14 @@ export default function RootLayout({
             toastOptions={{
               duration: 4000,
               style: {
-                background: '#363636',
-                color: '#fff',
+                background: 'hsl(var(--card))',
+                color: 'hsl(var(--card-foreground))',
+                border: '1px solid hsl(var(--border))',
               },
             }}
           />
           <QuickNav />
+          <ComplianceBanner />
         </AuthProvider>
       </body>
     </html>

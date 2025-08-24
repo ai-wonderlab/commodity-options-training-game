@@ -324,8 +324,8 @@ Charlie Risk,5400,92%,60,8.1,-45,-18,15,2`;
             
             <div className="flex items-center gap-2">
               <SessionControls 
-                session={session}
-                onControl={handleSessionControl}
+                sessionId={sessionId}
+                isInstructor={true}
               />
               <button
                 onClick={handleExport}

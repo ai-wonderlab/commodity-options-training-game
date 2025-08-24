@@ -113,58 +113,58 @@ export default function SessionPage() {
   }
 
   return (
-    <div className="h-[calc(100vh-120px)] flex">
+    <div className="h-[calc(100vh-80px)] flex gap-4 p-4 bg-background">
       {/* Left Panel - Futures & Option Chain */}
-      <div className="w-1/3 border-r border-gray-200 dark:border-gray-700 flex flex-col">
-        <MarketData ticks={sessionData.ticksLatest || {}} />
-        <div className="flex-1 overflow-hidden">
+      <div className="w-1/3 flex flex-col gap-4">
+        <MarketData ticks={Array.isArray(sessionData.ticksLatest) ? {} : sessionData.ticksLatest || {}} />
+        <div className="flex-1 min-h-0">
           <OptionChain 
             instruments={sessionData.session?.instruments || []}
-            ticks={sessionData.ticksLatest || {}}
+            ticks={Array.isArray(sessionData.ticksLatest) ? {} : sessionData.ticksLatest || {}}
           />
         </div>
       </div>
 
       {/* Center Panel - Trading & Portfolio */}
-      <div className="flex-1 flex flex-col">
-        <div className="border-b border-gray-200 dark:border-gray-700">
-          <div className="flex">
+      <div className="flex-1 flex flex-col rounded-lg border bg-card shadow-soft overflow-hidden">
+        <div className="border-b border-border bg-muted/30">
+          <div className="flex p-1">
             <button
               onClick={() => setSelectedTab('ticket')}
-              className={`px-4 py-2 font-medium ${
+              className={`flex-1 px-4 py-2 font-medium rounded-md transition-all ${
                 selectedTab === 'ticket'
-                  ? 'bg-white dark:bg-gray-800 border-b-2 border-blue-600 text-blue-600'
-                  : 'text-gray-600 hover:text-gray-800'
+                  ? 'bg-background shadow-soft text-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
               }`}
             >
               Order Ticket
             </button>
             <button
               onClick={() => setSelectedTab('positions')}
-              className={`px-4 py-2 font-medium ${
+              className={`flex-1 px-4 py-2 font-medium rounded-md transition-all ${
                 selectedTab === 'positions'
-                  ? 'bg-white dark:bg-gray-800 border-b-2 border-blue-600 text-blue-600'
-                  : 'text-gray-600 hover:text-gray-800'
+                  ? 'bg-background shadow-soft text-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
               }`}
             >
               Positions
             </button>
             <button
               onClick={() => setSelectedTab('risk')}
-              className={`px-4 py-2 font-medium ${
+              className={`flex-1 px-4 py-2 font-medium rounded-md transition-all ${
                 selectedTab === 'risk'
-                  ? 'bg-white dark:bg-gray-800 border-b-2 border-blue-600 text-blue-600'
-                  : 'text-gray-600 hover:text-gray-800'
+                  ? 'bg-background shadow-soft text-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
               }`}
             >
               Risk
             </button>
             <button
               onClick={() => setSelectedTab('whatif')}
-              className={`px-4 py-2 font-medium ${
+              className={`flex-1 px-4 py-2 font-medium rounded-md transition-all ${
                 selectedTab === 'whatif'
-                  ? 'bg-white dark:bg-gray-800 border-b-2 border-blue-600 text-blue-600'
-                  : 'text-gray-600 hover:text-gray-800'
+                  ? 'bg-background shadow-soft text-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
               }`}
             >
               What-If
@@ -172,7 +172,7 @@ export default function SessionPage() {
           </div>
         </div>
         
-        <div className="flex-1 p-4 overflow-auto">
+        <div className="flex-1 p-6 overflow-auto">
           {selectedTab === 'ticket' && (
             <OrderTicket 
               sessionId={sessionId}
@@ -183,7 +183,7 @@ export default function SessionPage() {
           {selectedTab === 'positions' && (
             <PositionsTable 
               positions={sessionData.positions.filter(p => p.participant_id === currentParticipant?.id)}
-              currentPrices={sessionData.ticksLatest}
+              currentPrices={Array.isArray(sessionData.ticksLatest) ? sessionData.ticksLatest : []}
             />
           )}
           {selectedTab === 'risk' && (
@@ -193,7 +193,7 @@ export default function SessionPage() {
             />
           )}
           {selectedTab === 'whatif' && (
-            <div className="text-center text-gray-500 py-8">
+            <div className="text-center text-muted-foreground py-8">
               What-If Analysis Coming Soon
             </div>
           )}
@@ -201,7 +201,7 @@ export default function SessionPage() {
       </div>
 
       {/* Right Panel - Leaderboard & Alerts */}
-      <div className="w-1/4 border-l border-gray-200 dark:border-gray-700 flex flex-col">
+      <div className="w-1/4 flex flex-col">
         <Leaderboard 
           leaderboard={sessionData.leaderboard}
           participants={sessionData.participants}
