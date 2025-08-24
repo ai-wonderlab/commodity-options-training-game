@@ -93,24 +93,24 @@ export default function HomePage() {
 
   return (
     <div className="min-h-[calc(100vh-120px)] flex items-center justify-center p-8">
-      <div className="max-w-4xl w-full">
+      <div className="max-w-4xl w-full animate-float">
         <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+          <h2 className="text-4xl font-black bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-3">
             ICE Brent Options Training
           </h2>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-lg text-gray-600 dark:text-gray-400">
             Practice trading EU-style Brent options with Black-76 pricing
           </p>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+        <div className="glass rounded-2xl shadow-2xl overflow-hidden">
           <div className="flex border-b border-gray-200 dark:border-gray-700">
             <button
               onClick={() => setMode('join')}
-              className={`flex-1 px-6 py-4 text-center font-medium transition-colors ${
+              className={`flex-1 px-6 py-5 text-center font-bold transition-all duration-300 ${
                 mode === 'join'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg transform scale-105'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50/50'
               }`}
             >
               <Users className="inline-block w-5 h-5 mr-2" />
@@ -118,10 +118,10 @@ export default function HomePage() {
             </button>
             <button
               onClick={() => setMode('create')}
-              className={`flex-1 px-6 py-4 text-center font-medium transition-colors ${
+              className={`flex-1 px-6 py-5 text-center font-bold transition-all duration-300 ${
                 mode === 'create'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg transform scale-105'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50/50'
               }`}
             >
               <Settings className="inline-block w-5 h-5 mr-2" />
