@@ -2,77 +2,102 @@
 
 import { Trophy, TrendingUp, TrendingDown } from 'lucide-react';
 
-export function Leaderboard() {
-  const participants = [
-    { rank: 1, name: 'Trader Alpha', pnl: 2845.50, score: 3845, change: 'up' },
-    { rank: 2, name: 'You', pnl: 1234.56, score: 2234, change: 'up', isYou: true },
-    { rank: 3, name: 'Market Maker', pnl: 987.23, score: 1987, change: 'down' },
-    { rank: 4, name: 'Option Pro', pnl: 456.78, score: 1456, change: 'up' },
-    { rank: 5, name: 'Risk Taker', pnl: -234.56, score: 765, change: 'down' },
-  ];
+interface LeaderboardProps {
+  leaderboard: any[];
+  participants: any[];
+  currentParticipantId?: string;
+}
+
+export default function Leaderboard({ leaderboard, participants, currentParticipantId }: LeaderboardProps) {
+  const sortedLeaderboard = [...(leaderboard || [])].sort((a, b) => b.score - a.score);
+
+  const getParticipantName = (participantId: string) => {
+    const participant = participants?.find(p => p.id === participantId);
+    return participant?.display_name || 'Unknown';
+  };
 
   const getRankIcon = (rank: number) => {
-    if (rank === 1) return '🥇';
-    if (rank === 2) return '🥈';
-    if (rank === 3) return '🥉';
-    return rank.toString();
+    if (rank === 1) return <Trophy className="w-4 h-4 text-yellow-500" />;
+    if (rank === 2) return <Trophy className="w-4 h-4 text-gray-400" />;
+    if (rank === 3) return <Trophy className="w-4 h-4 text-orange-600" />;
+    return <span className="w-4 h-4 text-center text-xs">{rank}</span>;
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1">
-          <Trophy size={16} className="text-yellow-500" />
-          Leaderboard
-        </h3>
-        <span className="text-xs text-gray-500">Live Rankings</span>
+    <div className="h-full flex flex-col bg-white dark:bg-gray-800">
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+        <h3 className="font-semibold text-gray-900 dark:text-white">Leaderboard</h3>
+      </div>
+      
+      <div className="flex-1 overflow-auto">
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 bg-gray-50 dark:bg-gray-700">
+            <tr className="text-xs text-gray-600 dark:text-gray-400">
+              <th className="py-2 px-2 text-left">Rank</th>
+              <th className="py-2 px-2 text-left">Player</th>
+              <th className="py-2 px-2 text-right">Score</th>
+              <th className="py-2 px-2 text-right">PnL</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedLeaderboard.map((entry, index) => {
+              const isCurrentUser = entry.participant_id === currentParticipantId;
+              const rank = index + 1;
+              
+              return (
+                <tr
+                  key={entry.participant_id}
+                  className={`
+                    border-t border-gray-100 dark:border-gray-700
+                    ${isCurrentUser ? 'bg-blue-50 dark:bg-blue-900/20 font-semibold' : ''}
+                    hover:bg-gray-50 dark:hover:bg-gray-700
+                  `}
+                >
+                  <td className="py-2 px-2">
+                    <div className="flex items-center">
+                      {getRankIcon(rank)}
+                    </div>
+                  </td>
+                  <td className="py-2 px-2">
+                    <div className="truncate">
+                      {getParticipantName(entry.participant_id)}
+                      {isCurrentUser && (
+                        <span className="ml-1 text-xs text-blue-600 dark:text-blue-400">(You)</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-2 px-2 text-right mono-num">
+                    {entry.score.toFixed(0)}
+                  </td>
+                  <td className={`py-2 px-2 text-right mono-num ${
+                    entry.pnl >= 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    <div className="flex items-center justify-end gap-1">
+                      {entry.pnl >= 0 ? (
+                        <TrendingUp className="w-3 h-3" />
+                      ) : (
+                        <TrendingDown className="w-3 h-3" />
+                      )}
+                      ${Math.abs(entry.pnl).toFixed(2)}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
-      <div className="space-y-2">
-        {participants.map((participant) => (
-          <div
-            key={participant.rank}
-            className={`flex items-center justify-between p-2 rounded ${
-              participant.isYou ? 'bg-blue-50 border border-blue-200' : 'hover:bg-gray-50'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-6 text-center text-sm font-bold">
-                {getRankIcon(participant.rank)}
-              </div>
-              <div>
-                <div className="text-sm font-medium">
-                  {participant.name}
-                  {participant.isYou && (
-                    <span className="ml-1 text-xs text-blue-600">(You)</span>
-                  )}
-                </div>
-                <div className="text-xs text-gray-500">
-                  Score: {participant.score.toLocaleString()}
-                </div>
-              </div>
-            </div>
-            
-            <div className="text-right">
-              <div className={`text-sm font-medium flex items-center gap-1 ${
-                participant.pnl >= 0 ? 'text-green-600' : 'text-red-600'
-              }`}>
-                {participant.change === 'up' ? (
-                  <TrendingUp size={12} />
-                ) : (
-                  <TrendingDown size={12} />
-                )}
-                {participant.pnl >= 0 ? '+' : ''}${Math.abs(participant.pnl).toFixed(2)}
-              </div>
-            </div>
+      <div className="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
+        <div className="text-xs text-gray-600 dark:text-gray-400">
+          <div className="flex justify-between mb-1">
+            <span>Session Mode:</span>
+            <span className="font-medium">Live</span>
           </div>
-        ))}
-      </div>
-
-      <div className="mt-3 pt-3 border-t border-gray-200">
-        <div className="flex justify-between text-xs text-gray-600">
-          <span>Total Players: 5</span>
-          <span>Session Time: 32:45</span>
+          <div className="flex justify-between">
+            <span>Participants:</span>
+            <span className="font-medium">{participants?.length || 0}/25</span>
+          </div>
         </div>
       </div>
     </div>

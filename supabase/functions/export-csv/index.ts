@@ -12,95 +12,164 @@ serve(async (req) => {
 
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    
+
     const url = new URL(req.url);
     const sessionId = url.searchParams.get('sessionId');
     const kind = url.searchParams.get('kind') || 'trades';
 
     if (!sessionId) {
       return new Response(
-        JSON.stringify({ error: 'sessionId required' }),
+        JSON.stringify({ error: 'sessionId is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    let csvData = '';
+    let csvContent = '';
     let filename = '';
 
     switch (kind) {
       case 'trades': {
         const { data: orders } = await supabase
           .from('orders')
-          .select('*, participant:participants(display_name)')
+          .select(`
+            ts,
+            participant_id,
+            participants!inner(display_name),
+            side,
+            type,
+            symbol,
+            expiry,
+            strike,
+            opt_type,
+            qty,
+            limit_price,
+            status,
+            fill_price,
+            fees,
+            filled_at
+          `)
           .eq('session_id', sessionId)
-          .order('ts', { ascending: true });
+          .order('ts', { ascending: false });
 
-        csvData = 'Timestamp,Participant,Side,Type,Symbol,Expiry,Strike,OptType,Qty,LimitPrice,FillPrice,Fees,Status\n';
+        csvContent = 'Timestamp,Participant,Side,Type,Symbol,Expiry,Strike,OptType,Qty,LimitPrice,Status,FillPrice,Fees,FilledAt\n';
+        
         orders?.forEach(order => {
-          csvData += `${order.ts},${order.participant.display_name},${order.side},${order.type},`;
-          csvData += `${order.symbol},${order.expiry || ''},${order.strike || ''},${order.opt_type || ''},`;
-          csvData += `${order.qty},${order.limit_price || ''},${order.fill_price || ''},${order.fees},${order.status}\n`;
+          csvContent += `${order.ts},${order.participants.display_name},${order.side},${order.type},`;
+          csvContent += `${order.symbol},${order.expiry || ''},${order.strike || ''},${order.opt_type || ''},`;
+          csvContent += `${order.qty},${order.limit_price || ''},${order.status},`;
+          csvContent += `${order.fill_price || ''},${order.fees || ''},${order.filled_at || ''}\n`;
         });
-        filename = `trades_${sessionId.slice(0, 8)}.csv`;
+        
+        filename = `trades_${sessionId}_${new Date().toISOString()}.csv`;
         break;
       }
 
       case 'greeks': {
-        const { data: greeks } = await supabase
+        const { data: snapshots } = await supabase
           .from('greek_snapshots')
-          .select('*, participant:participants(display_name)')
-          .eq('participant_id.session_id', sessionId)
-          .order('ts', { ascending: true });
+          .select(`
+            ts,
+            participant_id,
+            participants!inner(display_name),
+            delta,
+            gamma,
+            vega,
+            theta,
+            vanna,
+            vomma,
+            var_estimate,
+            portfolio_value
+          `)
+          .in('participant_id', 
+            (await supabase
+              .from('participants')
+              .select('id')
+              .eq('session_id', sessionId)).data?.map(p => p.id) || []
+          )
+          .order('ts', { ascending: false });
 
-        csvData = 'Timestamp,Participant,Delta,Gamma,Vega,Theta,Vanna,Vomma,VaR,PortfolioValue\n';
-        greeks?.forEach(g => {
-          csvData += `${g.ts},${g.participant.display_name},${g.delta},${g.gamma},`;
-          csvData += `${g.vega},${g.theta},${g.vanna},${g.vomma},${g.var_estimate},${g.portfolio_value}\n`;
+        csvContent = 'Timestamp,Participant,Delta,Gamma,Vega,Theta,Vanna,Vomma,VaR,PortfolioValue\n';
+        
+        snapshots?.forEach(snap => {
+          csvContent += `${snap.ts},${snap.participants.display_name},`;
+          csvContent += `${snap.delta},${snap.gamma},${snap.vega},${snap.theta},`;
+          csvContent += `${snap.vanna},${snap.vomma},${snap.var_estimate},${snap.portfolio_value}\n`;
         });
-        filename = `greeks_${sessionId.slice(0, 8)}.csv`;
+        
+        filename = `greeks_${sessionId}_${new Date().toISOString()}.csv`;
         break;
       }
 
       case 'breaches': {
         const { data: breaches } = await supabase
           .from('breach_events')
-          .select('*, participant:participants(display_name)')
-          .eq('participant_id.session_id', sessionId)
-          .order('start_ts', { ascending: true });
+          .select(`
+            start_ts,
+            end_ts,
+            participant_id,
+            participants!inner(display_name),
+            type,
+            severity,
+            limit_value,
+            actual_value,
+            penalty_applied
+          `)
+          .in('participant_id',
+            (await supabase
+              .from('participants')
+              .select('id')
+              .eq('session_id', sessionId)).data?.map(p => p.id) || []
+          )
+          .order('start_ts', { ascending: false });
 
-        csvData = 'StartTime,EndTime,Participant,Type,Severity,LimitValue,ActualValue,Penalty\n';
-        breaches?.forEach(b => {
-          csvData += `${b.start_ts},${b.end_ts || 'ongoing'},${b.participant.display_name},`;
-          csvData += `${b.type},${b.severity},${b.limit_value},${b.actual_value},${b.penalty_applied}\n`;
+        csvContent = 'StartTime,EndTime,Participant,Type,Severity,Limit,Actual,Penalty\n';
+        
+        breaches?.forEach(breach => {
+          csvContent += `${breach.start_ts},${breach.end_ts || 'ongoing'},`;
+          csvContent += `${breach.participants.display_name},${breach.type},${breach.severity},`;
+          csvContent += `${breach.limit_value},${breach.actual_value},${breach.penalty_applied}\n`;
         });
-        filename = `breaches_${sessionId.slice(0, 8)}.csv`;
+        
+        filename = `breaches_${sessionId}_${new Date().toISOString()}.csv`;
         break;
       }
 
       case 'leaderboard': {
         const { data: leaderboard } = await supabase
           .from('leaderboard')
-          .select('*, participant:participants(display_name)')
+          .select(`
+            participant_id,
+            participants!inner(display_name, seat_no),
+            pnl,
+            score,
+            drawdown,
+            penalties,
+            rank,
+            updated_at
+          `)
           .eq('session_id', sessionId)
-          .order('rank', { ascending: true });
+          .order('score', { ascending: false });
 
-        csvData = 'Rank,Participant,PnL,Score,Drawdown,Penalties\n';
-        leaderboard?.forEach((entry, idx) => {
-          csvData += `${idx + 1},${entry.participant.display_name},${entry.pnl},`;
-          csvData += `${entry.score},${entry.drawdown},${entry.penalties}\n`;
+        csvContent = 'Rank,Seat,Participant,PnL,Score,Drawdown,Penalties,LastUpdate\n';
+        
+        leaderboard?.forEach((entry, index) => {
+          csvContent += `${index + 1},${entry.participants.seat_no},`;
+          csvContent += `${entry.participants.display_name},${entry.pnl},`;
+          csvContent += `${entry.score},${entry.drawdown},${entry.penalties},${entry.updated_at}\n`;
         });
-        filename = `leaderboard_${sessionId.slice(0, 8)}.csv`;
+        
+        filename = `leaderboard_${sessionId}_${new Date().toISOString()}.csv`;
         break;
       }
 
       default:
         return new Response(
-          JSON.stringify({ error: 'Invalid export kind' }),
+          JSON.stringify({ error: 'Invalid export kind. Use: trades, greeks, breaches, or leaderboard' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
     }
 
-    return new Response(csvData, {
+    return new Response(csvContent, {
       status: 200,
       headers: {
         ...corsHeaders,
@@ -112,7 +181,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Export error:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({ error: 'Failed to export data', details: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

@@ -1,189 +1,285 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '../lib/supabaseClient';
+import toast from 'react-hot-toast';
+import { ArrowRight, Play, Users, Settings } from 'lucide-react';
 
 export default function HomePage() {
-  const [mode, setMode] = useState<'create' | 'join'>('create');
+  const router = useRouter();
+  const [mode, setMode] = useState<'create' | 'join'>('join');
   const [sessionId, setSessionId] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  
+  // Create session form state
+  const [sessionConfig, setSessionConfig] = useState({
+    mode: 'live' as 'live' | 'replay',
+    bankroll: 100000,
+    varLimit: 5000,
+    maxPlayers: 25,
+    replayDay: '',
+    replaySpeed: 1,
+  });
 
-  const handleCreateSession = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreateSession = async () => {
     setLoading(true);
-    setError('');
-
     try {
-      // For now, mock the session creation
-      const mockSessionId = `session-${Date.now()}`;
-      window.location.href = `/session/${mockSessionId}`;
-    } catch (err) {
-      setError('Failed to create session');
+      const response = await fetch('/api/functions/session-create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+        body: JSON.stringify({
+          mode: sessionConfig.mode,
+          bankroll: sessionConfig.bankroll,
+          var_limit: sessionConfig.varLimit,
+          replay_day: sessionConfig.replayDay || undefined,
+          replay_speed: sessionConfig.replaySpeed,
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create session');
+      }
+
+      toast.success('Session created successfully!');
+      router.push(`/session/${data.sessionId}`);
+    } catch (error) {
+      toast.error(error.message || 'Failed to create session');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleJoinSession = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+  const handleJoinSession = async () => {
+    if (!sessionId.trim() || !displayName.trim()) {
+      toast.error('Please enter session ID and display name');
+      return;
+    }
 
+    setLoading(true);
     try {
-      if (!sessionId || !displayName) {
-        setError('Please enter session ID and display name');
-        return;
+      const response = await fetch('/api/functions/session-join', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+        body: JSON.stringify({
+          sessionId: sessionId.trim(),
+          display_name: displayName.trim(),
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to join session');
       }
-      window.location.href = `/session/${sessionId}`;
-    } catch (err) {
-      setError('Failed to join session');
+
+      toast.success('Joined session successfully!');
+      router.push(`/session/${sessionId}`);
+    } catch (error) {
+      toast.error(error.message || 'Failed to join session');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="bg-white rounded-lg shadow-xl p-8">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-brent-dark mb-2">
-              Commodity Options Training Game
-            </h1>
-            <p className="text-gray-600">ICE Brent Futures & Options (Black-76)</p>
-          </div>
+    <div className="min-h-[calc(100vh-120px)] flex items-center justify-center p-8">
+      <div className="max-w-4xl w-full">
+        <div className="text-center mb-8">
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            ICE Brent Options Training
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400">
+            Practice trading EU-style Brent options with Black-76 pricing
+          </p>
+        </div>
 
-          <div className="flex gap-2 mb-6">
-            <button
-              onClick={() => setMode('create')}
-              className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${
-                mode === 'create'
-                  ? 'bg-brent-blue text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Create Session
-            </button>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+          <div className="flex border-b border-gray-200 dark:border-gray-700">
             <button
               onClick={() => setMode('join')}
-              className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${
+              className={`flex-1 px-6 py-4 text-center font-medium transition-colors ${
                 mode === 'join'
-                  ? 'bg-brent-blue text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
             >
+              <Users className="inline-block w-5 h-5 mr-2" />
               Join Session
+            </button>
+            <button
+              onClick={() => setMode('create')}
+              className={`flex-1 px-6 py-4 text-center font-medium transition-colors ${
+                mode === 'create'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Settings className="inline-block w-5 h-5 mr-2" />
+              Create Session
             </button>
           </div>
 
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
-              {error}
-            </div>
-          )}
-
-          {mode === 'create' ? (
-            <form onSubmit={handleCreateSession} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Session Mode
-                </label>
-                <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brent-blue">
-                  <option value="live">Live (15-min delayed)</option>
-                  <option value="replay">Replay Historical Day</option>
-                </select>
+          <div className="p-6">
+            {mode === 'join' ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Session ID
+                  </label>
+                  <input
+                    type="text"
+                    value={sessionId}
+                    onChange={(e) => setSessionId(e.target.value)}
+                    placeholder="Enter session ID"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Display Name
+                  </label>
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="Enter your display name"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  />
+                </div>
+                <button
+                  onClick={handleJoinSession}
+                  disabled={loading}
+                  className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  {loading ? (
+                    'Joining...'
+                  ) : (
+                    <>
+                      Join Session
+                      <ArrowRight className="ml-2 w-5 h-5" />
+                    </>
+                  )}
+                </button>
               </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Session Mode
+                    </label>
+                    <select
+                      value={sessionConfig.mode}
+                      onChange={(e) => setSessionConfig({ ...sessionConfig, mode: e.target.value as 'live' | 'replay' })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    >
+                      <option value="live">Live (15-min delayed)</option>
+                      <option value="replay">Replay Historical</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Starting Bankroll
+                    </label>
+                    <input
+                      type="number"
+                      value={sessionConfig.bankroll}
+                      onChange={(e) => setSessionConfig({ ...sessionConfig, bankroll: parseInt(e.target.value) })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      VaR Limit (95% confidence)
+                    </label>
+                    <input
+                      type="number"
+                      value={sessionConfig.varLimit}
+                      onChange={(e) => setSessionConfig({ ...sessionConfig, varLimit: parseInt(e.target.value) })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Max Players
+                    </label>
+                    <input
+                      type="number"
+                      value={sessionConfig.maxPlayers}
+                      onChange={(e) => setSessionConfig({ ...sessionConfig, maxPlayers: parseInt(e.target.value) })}
+                      min="1"
+                      max="25"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    />
+                  </div>
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Starting Bankroll
-                </label>
-                <input
-                  type="number"
-                  defaultValue={100000}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brent-blue"
-                />
+                {sessionConfig.mode === 'replay' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Replay Date
+                      </label>
+                      <input
+                        type="date"
+                        value={sessionConfig.replayDay}
+                        onChange={(e) => setSessionConfig({ ...sessionConfig, replayDay: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Replay Speed
+                      </label>
+                      <select
+                        value={sessionConfig.replaySpeed}
+                        onChange={(e) => setSessionConfig({ ...sessionConfig, replaySpeed: parseInt(e.target.value) })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                      >
+                        <option value="1">1x (Real-time)</option>
+                        <option value="2">2x</option>
+                        <option value="4">4x</option>
+                        <option value="8">8x</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleCreateSession}
+                  disabled={loading}
+                  className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  {loading ? (
+                    'Creating...'
+                  ) : (
+                    <>
+                      Create Session
+                      <Play className="ml-2 w-5 h-5" />
+                    </>
+                  )}
+                </button>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  VaR Limit (95%)
-                </label>
-                <input
-                  type="number"
-                  defaultValue={5000}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brent-blue"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Max Players
-                </label>
-                <input
-                  type="number"
-                  defaultValue={25}
-                  min={1}
-                  max={25}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brent-blue"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 bg-brent-blue text-white rounded-md hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
-              >
-                {loading ? 'Creating...' : 'Create Session'}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleJoinSession} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Session ID
-                </label>
-                <input
-                  type="text"
-                  value={sessionId}
-                  onChange={(e) => setSessionId(e.target.value)}
-                  placeholder="Enter session ID"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brent-blue"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Display Name
-                </label>
-                <input
-                  type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Enter your name"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brent-blue"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 bg-brent-blue text-white rounded-md hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
-              >
-                {loading ? 'Joining...' : 'Join Session'}
-              </button>
-            </form>
-          )}
-
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-xs text-gray-500 text-center">
-              Educational use only • Not for production trading
-              <br />
-              Prices are 15-min delayed • EU data residency
-            </p>
+            )}
           </div>
+        </div>
+
+        <div className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
+          <p>Contract: 1,000 bbl • Tick: $0.01/bbl • European exercise</p>
+          <p>Model: Black-76 • Greeks: Δ, Γ, ν, Θ, Vanna, Vomma</p>
         </div>
       </div>
     </div>

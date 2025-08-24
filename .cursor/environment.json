@@ -1,27 +1,24 @@
 {
-  "project": "commodity-options-training-game",
-  "type": "monorepo",
-  "description": "ICE Brent Options Training Game using Black-76 model",
-  "tools": {
-    "allowed": [
-      "git",
-      "npm",
-      "npx",
-      "supabase"
-    ],
-    "supabase": {
-      "cli": true,
-      "region": "EU",
-      "required": true
-    }
-  },
-  "workspaces": [
-    "apps/web",
-    "packages/shared"
+  "allowCommands": [
+    "git init -b main",
+    "git add . && git commit -m \"<msg>\"",
+    "git push",
+    "npm ci",
+    "npm install",
+    "npm run build --workspaces",
+    "npx supabase --version",
+    "npx supabase login",
+    "npx supabase link --project-ref <ref>",
+    "npx supabase db push",
+    "npx supabase functions deploy <name>",
+    "npx supabase secrets set --env-file <path>"
   ],
-  "compliance": {
-    "dataResidency": "EU",
-    "educationOnly": true,
-    "delayedPrices": "15min"
+  "notes": "Only use these commands. Ask before any other command.",
+  "supabase": {
+    "region": "eu",
+    "edgeFunctionsRuntime": "deno",
+    "linking": "use project ref",
+    "authProviders": ["google", "azure"]
   }
 }
+

@@ -2,21 +2,24 @@
 module.exports = {
   content: [
     './app/**/*.{js,ts,jsx,tsx,mdx}',
+    './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     extend: {
       colors: {
-        'brent-blue': '#0066CC',
-        'brent-dark': '#001F3F',
-        'profit-green': '#10B981',
-        'loss-red': '#EF4444',
-        'warning-amber': '#F59E0B',
+        'brent-blue': '#003366',
+        'brent-green': '#00a652',
+        'brent-red': '#dc2626',
+        'brent-orange': '#f97316',
       },
-      animation: {
-        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+      fontFamily: {
+        'mono': ['Monaco', 'Consolas', 'monospace'],
       },
     },
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/forms'),
+    require('@tailwindcss/typography'),
+  ],
 }

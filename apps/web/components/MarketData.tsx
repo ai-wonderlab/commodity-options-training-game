@@ -1,76 +1,67 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
-export function MarketData() {
-  const [brnPrice, setBrnPrice] = useState(82.45);
-  const [brnChange, setBrnChange] = useState(0.23);
-  const [tick, setTick] = useState(0);
+interface MarketDataProps {
+  ticks: any[];
+}
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const change = (Math.random() - 0.5) * 0.1;
-      setBrnPrice(prev => {
-        const newPrice = prev + change;
-        setBrnChange(change);
-        return newPrice;
-      });
-      setTick(t => t + 1);
-    }, 5000);
+export default function MarketData({ ticks }: MarketDataProps) {
+  const brnTick = ticks?.find(t => t.symbol === 'BRN');
+  
+  if (!brnTick) {
+    return (
+      <div className="p-4 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div className="text-center text-gray-500">No market data available</div>
+      </div>
+    );
+  }
 
-    return () => clearInterval(interval);
-  }, []);
-
-  const isUp = brnChange >= 0;
+  const change = Math.random() * 2 - 1; // Mock change
+  const changePercent = (change / brnTick.mid) * 100;
+  const isUp = change > 0;
+  const isDown = change < 0;
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-      <h3 className="text-sm font-semibold text-gray-700 mb-3">Market Data</h3>
+    <div className="p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="font-semibold text-lg">ICE Brent (BRN)</h3>
+        <span className="text-xs text-gray-500 bg-yellow-100 px-2 py-1 rounded">
+          15min delayed
+        </span>
+      </div>
       
-      <div className="space-y-3">
-        {/* BRN Futures */}
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs text-gray-600">BRN Futures</p>
-            <p className="text-lg font-bold">${brnPrice.toFixed(2)}</p>
-          </div>
-          <div className={`flex items-center gap-1 ${isUp ? 'text-green-600' : 'text-red-600'}`}>
-            {isUp ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-            <span className="text-sm font-medium">
-              {isUp ? '+' : ''}{brnChange.toFixed(2)}
+      <div className="flex items-center gap-4">
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl font-bold mono-num">
+              ${brnTick.mid.toFixed(2)}
             </span>
+            {isUp && <TrendingUp className="w-5 h-5 text-green-600" />}
+            {isDown && <TrendingDown className="w-5 h-5 text-red-600" />}
+            {!isUp && !isDown && <Minus className="w-5 h-5 text-gray-400" />}
+          </div>
+          <div className={`text-sm ${isUp ? 'text-green-600' : isDown ? 'text-red-600' : 'text-gray-600'}`}>
+            {isUp ? '+' : ''}{change.toFixed(2)} ({isUp ? '+' : ''}{changePercent.toFixed(2)}%)
           </div>
         </div>
-
-        {/* Market Stats */}
-        <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-100">
+        
+        <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <p className="text-xs text-gray-600">Bid</p>
-            <p className="text-sm font-medium">${(brnPrice - 0.05).toFixed(2)}</p>
+            <div className="text-gray-500 dark:text-gray-400">Bid</div>
+            <div className="font-medium mono-num">${brnTick.best_bid.toFixed(2)}</div>
           </div>
           <div>
-            <p className="text-xs text-gray-600">Ask</p>
-            <p className="text-sm font-medium">${(brnPrice + 0.05).toFixed(2)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-600">Volume</p>
-            <p className="text-sm font-medium">125,432</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-600">Open Interest</p>
-            <p className="text-sm font-medium">89,234</p>
+            <div className="text-gray-500 dark:text-gray-400">Ask</div>
+            <div className="font-medium mono-num">${brnTick.best_ask.toFixed(2)}</div>
           </div>
         </div>
-
-        {/* Update Indicator */}
-        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-          <span className="text-xs text-gray-500">Last Update</span>
-          <div className="flex items-center gap-1">
-            <div className={`w-2 h-2 rounded-full ${tick % 2 === 0 ? 'bg-green-500' : 'bg-green-400'} animate-pulse`} />
-            <span className="text-xs text-gray-600">15-min delayed</span>
-          </div>
-        </div>
+      </div>
+      
+      <div className="mt-3 flex gap-4 text-xs text-gray-500">
+        <div>Contract: 1,000 bbl</div>
+        <div>Tick: $0.01/bbl</div>
+        <div>Time: {new Date(brnTick.ts).toLocaleTimeString()}</div>
       </div>
     </div>
   );

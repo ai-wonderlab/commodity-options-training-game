@@ -1,29 +1,52 @@
-import './globals.css'
-import { Inter } from 'next/font/google'
-import type { Metadata } from 'next'
+import './globals.css';
+import { Toaster } from 'react-hot-toast';
 
-const inter = Inter({ subsets: ['latin'] })
-
-export const metadata: Metadata = {
+export const metadata = {
   title: 'Commodity Options Training Game - ICE Brent',
-  description: 'Professional options trading simulator for ICE Brent crude oil futures and options. Education only.',
-}
+  description: 'Desktop-first training game for EU-style Brent options (BUL) on ICE Brent futures (BRN)',
+};
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
-        <div className="min-h-screen bg-gray-50">
-          {children}
+      <body className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="min-h-screen flex flex-col">
+          <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+            <div className="max-w-screen-2xl mx-auto px-4 py-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                    Commodity Options Training Game
+                  </h1>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Education only • ICE Brent (BRN) & Options (BUL) • 15-min delayed • EU region only
+                  </p>
+                </div>
+                <div id="auth-container" className="flex items-center gap-4">
+                  {/* Auth component will be mounted here */}
+                </div>
+              </div>
+            </div>
+          </header>
+          <main className="flex-1">
+            {children}
+          </main>
         </div>
-        <div className="fixed bottom-2 right-2 text-xs text-gray-500 bg-white/80 px-2 py-1 rounded">
-          Education only • 15-min delayed • EU data residency
-        </div>
+        <Toaster 
+          position="top-right"
+          toastOptions={{
+            duration: 4000,
+            style: {
+              background: '#363636',
+              color: '#fff',
+            },
+          }}
+        />
       </body>
     </html>
-  )
+  );
 }
