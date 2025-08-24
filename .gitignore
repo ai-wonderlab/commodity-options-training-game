@@ -1,0 +1,14 @@
+.DS_Store
+assets/.DS_Store
+.DS_Store
+
+node_modules
+.next
+out
+dist
+build
+coverage
+.supabase
+.env
+.env.*
+supabase/.temp

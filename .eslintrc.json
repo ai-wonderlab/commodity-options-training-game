@@ -1,0 +1,8 @@
+{
+  "root": true,
+  "env": { "es2022": true, "browser": true, "node": true },
+  "parserOptions": { "ecmaVersion": 2022, "sourceType": "module" },
+  "extends": [],
+  "ignorePatterns": ["dist", "out", "node_modules"]
+}
+

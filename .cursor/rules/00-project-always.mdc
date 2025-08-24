@@ -1,0 +1,46 @@
+TITLE: Commodity Options Training Game — Persistent Rules
+
+SCOPE
+- Build a desktop-first, browser-only training game for commodity options.
+- Monorepo structure:
+  - apps/web (Next.js SSG)
+  - packages/shared (quant & risk TypeScript lib)
+  - supabase/functions (Edge Functions)
+  - supabase/migrations (SQL schema & seeds)
+
+AUTHORITATIVE SPEC (North Star)
+- Market: ICE Brent (BRN) futures & EU‑Style Brent options (BUL). European exercise, contract size 1,000 bbl, $0.01/bbl tick.
+- Model: Black‑76 (options on futures). Greeks: Delta, Gamma, Vega, Theta (centered FD), Vanna, Vomma (FD; read-only).
+- Modes: Live (15‑min delayed) and Replay (historical price path + IV surface snapshots).
+- Orders: Market, Limit. Fills: mid-based with configurable bid/ask spread; no slippage; apply fees.
+- Risk: caps on |Δ|, |Γ|, |Vega|, |Θ| + 95% 1‑day VaR. Policy: allow but flag + penalize.
+- Scoring: Score = Realized PnL − (breach time α + VaR exceed β + drawdown γ + fees). Host-configurable weights.
+- Sessions: up to 25 players; solo; 60–90 min & multi‑day; instructor console (pause/freeze, shocks, exports).
+- Language: English only. Region: EU. SSO: Google + Microsoft.
+
+ARCHITECTURE
+- Next.js SSG (no SSR) exported to static for GitHub Pages.
+- Supabase (EU) for DB/Auth/Realtime; Edge Functions for APIs.
+- Data provider interface for live/replay; mock provider ships by default.
+
+CODING STANDARDS
+- TypeScript strict mode.
+- Unit tests for quant/risk; FD convergence checks; put‑call parity under Black‑76.
+- Small, reviewable diffs; Conventional Commits; rationale in commit body.
+- Readability first: descriptive names, guard clauses, minimal nesting, meaningful error handling.
+
+SECURITY & COMPLIANCE
+- EU data residency only; education-only copy visible in UI. Include ICE delayed attribution placeholder.
+- Two security pauses:
+  1) Before linking/deploying Supabase: operator sets GitHub secrets (EU project).
+  2) After enabling OAuth providers in Supabase: operator confirms.
+
+ACCEPTANCE CHECKS
+- Public GitHub Pages URL loads app (English-only) backed by EU Supabase.
+- Create session → join → trade MKT/LMT; fills mid±spread; fees applied; positions/Greeks/VaR/Score live; breaches flagged; leaderboard updates.
+- Replay runs (1×–8×); shocks affect P&L/Greeks; CSV exports download.
+- Tests green; README includes Admin Quick Start.
+
+TOOLS & COMMANDS
+- Allow-list only: git init/push, npm install/build workspaces, Supabase CLI (version/login/link/db push/functions deploy/secrets set). Ask before anything else.
+
