@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # Optional: Local Supabase for development
+  supabase-db:
+    image: supabase/postgres:15.1.0.117
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    profiles:
+      - local-supabase
+
+  supabase-auth:
+    image: supabase/gotrue:v2.151.0
+    depends_on:
+      - supabase-db
+    environment:
+      - GOTRUE_API_HOST=0.0.0.0
+      - GOTRUE_API_PORT=9999
+      - GOTRUE_DB_DRIVER=postgres
+      - GOTRUE_DB_DATABASE_URL=postgres://postgres:postgres@supabase-db:5432/postgres?sslmode=disable
+      - GOTRUE_SITE_URL=http://localhost:3000
+      - GOTRUE_JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long
+      - GOTRUE_JWT_EXP=3600
+    ports:
+      - "9999:9999"
+    networks:
+      - app-network
+    profiles:
+      - local-supabase
+
+  supabase-realtime:
+    image: supabase/realtime:v2.28.32
+    depends_on:
+      - supabase-db
+    environment:
+      - DB_HOST=supabase-db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=postgres
+      - DB_SSL=false
+      - PORT=4000
+      - JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long
+      - REPLICATION_MODE=RLS
+      - REPLICATION_POLL_INTERVAL=100
+      - SECURE_CHANNELS=true
+      - SLOT_NAME=supabase_realtime_rls
+      - TEMPORARY_SLOT=true
+    ports:
+      - "4000:4000"
+    networks:
+      - app-network
+    profiles:
+      - local-supabase
+
+  supabase-storage:
+    image: supabase/storage-api:v0.46.4
+    depends_on:
+      - supabase-db
+    environment:
+      - ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+      - SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+      - DATABASE_URL=postgres://postgres:postgres@supabase-db:5432/postgres
+      - PGRST_JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long
+      - FILE_SIZE_LIMIT=52428800
+      - STORAGE_BACKEND=file
+      - FILE_STORAGE_BACKEND_PATH=/var/lib/storage
+      - TENANT_ID=stub
+      - REGION=stub
+      - GLOBAL_S3_BUCKET=stub
+    volumes:
+      - storage-data:/var/lib/storage
+    ports:
+      - "5000:5000"
+    networks:
+      - app-network
+    profiles:
+      - local-supabase
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  storage-data:
