@@ -50,7 +50,7 @@ export default function HomePage() {
       toast.success('Session created successfully!');
       router.push(`/session/${data.sessionId}`);
     } catch (error) {
-      toast.error(error.message || 'Failed to create session');
+      toast.error((error as any).message || 'Failed to create session');
     } finally {
       setLoading(false);
     }
@@ -85,7 +85,7 @@ export default function HomePage() {
       toast.success('Joined session successfully!');
       router.push(`/session/${sessionId}`);
     } catch (error) {
-      toast.error(error.message || 'Failed to join session');
+      toast.error((error as any).message || 'Failed to join session');
     } finally {
       setLoading(false);
     }
