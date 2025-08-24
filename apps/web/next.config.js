@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
+  // Remove 'output: export' for dynamic routes to work
+  // output: 'export',
   reactStrictMode: true,
   poweredByHeader: false,
   compiler: {

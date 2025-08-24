@@ -1,5 +1,7 @@
 {
-  "root": false,
-  "extends": ["next/core-web-vitals"],
-  "parserOptions": { "ecmaVersion": 2022, "sourceType": "module" }
+  "extends": "next/core-web-vitals",
+  "rules": {
+    "@next/next/no-img-element": "off",
+    "react-hooks/exhaustive-deps": "warn"
+  }
 }

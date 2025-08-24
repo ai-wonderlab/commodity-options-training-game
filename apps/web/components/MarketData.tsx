@@ -7,7 +7,7 @@ interface MarketDataProps {
 }
 
 export default function MarketData({ ticks }: MarketDataProps) {
-  const brnTick = ticks?.find(t => t.symbol === 'BRN');
+  const brnTick = ticks?.find((t: any) => t.symbol === 'BRN');
   
   if (!brnTick) {
     return (

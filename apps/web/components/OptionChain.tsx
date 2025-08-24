@@ -16,7 +16,7 @@ export default function OptionChain({ instruments, ticks }: OptionChainProps) {
   const expiries = optionInstrument?.expiries || [];
   
   const currentExpiry = selectedExpiry || expiries[0]?.date;
-  const strikes = expiries.find(e => e.date === currentExpiry)?.strikes || [];
+  const strikes = expiries.find((e: any) => e.date === currentExpiry)?.strikes || [];
 
   // Get current BRN price for ATM marker
   const brnPrice = ticks?.find(t => t.symbol === 'BRN')?.mid || 82.5;
