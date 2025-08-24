@@ -1,46 +1,122 @@
-TITLE: Commodity Options Training Game — Persistent Rules
+# Commodity Options Training Game - Core Rules
+alwaysApply: true
 
-SCOPE
-- Build a desktop-first, browser-only training game for commodity options.
-- Monorepo structure:
-  - apps/web (Next.js SSG)
-  - packages/shared (quant & risk TypeScript lib)
-  - supabase/functions (Edge Functions)
-  - supabase/migrations (SQL schema & seeds)
+## NORTH STAR (Acceptance Contract)
+This is a desktop-first, browser-only training game for ICE Brent options trading education.
 
-AUTHORITATIVE SPEC (North Star)
-- Market: ICE Brent (BRN) futures & EU‑Style Brent options (BUL). European exercise, contract size 1,000 bbl, $0.01/bbl tick.
-- Model: Black‑76 (options on futures). Greeks: Delta, Gamma, Vega, Theta (centered FD), Vanna, Vomma (FD; read-only).
-- Modes: Live (15‑min delayed) and Replay (historical price path + IV surface snapshots).
-- Orders: Market, Limit. Fills: mid-based with configurable bid/ask spread; no slippage; apply fees.
-- Risk: caps on |Δ|, |Γ|, |Vega|, |Θ| + 95% 1‑day VaR. Policy: allow but flag + penalize.
-- Scoring: Score = Realized PnL − (breach time α + VaR exceed β + drawdown γ + fees). Host-configurable weights.
-- Sessions: up to 25 players; solo; 60–90 min & multi‑day; instructor console (pause/freeze, shocks, exports).
-- Language: English only. Region: EU. SSO: Google + Microsoft.
+### Core Requirements
+- **Pricing Model**: Black-76 (European options)
+- **Greeks**: Δ, Γ, Vega, Θ (finite difference), Vanna/Vomma (read-only)
+- **Data**: 15-minute delayed live + replay modes
+- **Order Types**: Market/Limit with mid±spread fills
+- **Risk Management**: Risk caps + VaR(95%), allow-but-penalize breaches
+- **Scoring**: Risk-adjusted (realized P&L - penalties)
+- **Capacity**: 25 concurrent players per session
+- **Deployment**: GitHub Pages (static) + Supabase EU
 
-ARCHITECTURE
-- Next.js SSG (no SSR) exported to static for GitHub Pages.
-- Supabase (EU) for DB/Auth/Realtime; Edge Functions for APIs.
-- Data provider interface for live/replay; mock provider ships by default.
+### Technical Standards
+- TypeScript strict mode
+- Unit tests for all quant functions
+- EU data residency only
+- "Education only" compliance
+- No real money trading
+- 15-minute data delay attribution
 
-CODING STANDARDS
-- TypeScript strict mode.
-- Unit tests for quant/risk; FD convergence checks; put‑call parity under Black‑76.
-- Small, reviewable diffs; Conventional Commits; rationale in commit body.
-- Readability first: descriptive names, guard clauses, minimal nesting, meaningful error handling.
+## Code Standards
 
-SECURITY & COMPLIANCE
-- EU data residency only; education-only copy visible in UI. Include ICE delayed attribution placeholder.
-- Two security pauses:
-  1) Before linking/deploying Supabase: operator sets GitHub secrets (EU project).
-  2) After enabling OAuth providers in Supabase: operator confirms.
+### TypeScript
+```typescript
+// Always use strict types
+interface Position {
+  strike: number;
+  expiry: Date;
+  optType: 'C' | 'P';
+  quantity: number; // positive long, negative short
+  contractMultiplier: number; // 1000 bbl
+}
+```
 
-ACCEPTANCE CHECKS
-- Public GitHub Pages URL loads app (English-only) backed by EU Supabase.
-- Create session → join → trade MKT/LMT; fills mid±spread; fees applied; positions/Greeks/VaR/Score live; breaches flagged; leaderboard updates.
-- Replay runs (1×–8×); shocks affect P&L/Greeks; CSV exports download.
-- Tests green; README includes Admin Quick Start.
+### Testing
+- Test Black-76 against known values
+- Test put-call parity invariant
+- Test VaR monotonicity
+- Test fill engine edge cases
+- Test breach lifecycle
 
-TOOLS & COMMANDS
-- Allow-list only: git init/push, npm install/build workspaces, Supabase CLI (version/login/link/db push/functions deploy/secrets set). Ask before anything else.
+### Error Handling
+- Never swallow errors silently
+- Always provide user-friendly messages in Greek
+- Log technical details to console
+- Use toast notifications for user feedback
 
+## Data Residency & Compliance
+
+### EU Requirements
+- Supabase region: EU (Frankfurt/Dublin)
+- No data transfer outside EU
+- GDPR compliant data handling
+- Right to deletion support
+
+### Educational Compliance
+- Always show "Education Only" banner
+- Display "Not Investment Advice" disclaimer
+- Show "15-minute delayed data" notice
+- No real money references
+- No trading recommendations
+
+## Architecture Principles
+
+### Frontend (Next.js)
+- Static Site Generation (SSG) for GitHub Pages
+- Client-side only for dynamic data
+- Use Supabase Realtime for live updates
+- Optimistic UI updates
+- Progressive enhancement
+
+### Backend (Supabase)
+- Edge Functions for API logic
+- RLS policies for data security
+- Realtime channels for broadcasting
+- PostgreSQL for persistence
+- Service role only from Edge Functions
+
+### Performance
+- Batch database operations
+- Use indexes on frequent queries
+- Cache IV surfaces
+- Throttle realtime updates to 1/sec
+- Limit replay speed to 8x
+
+## Security
+
+### Authentication
+- SSO only (Google/Microsoft)
+- First user becomes instructor
+- Session-based access control
+- JWT validation in Edge Functions
+
+### Data Access
+- RLS enabled on all tables
+- Participants see own data only
+- Instructors see all session data
+- No direct database access from client
+
+## User Experience
+
+### Language
+- Primary UI in Greek
+- Technical terms can remain in English
+- Error messages in Greek
+- Numbers use US format (. for decimal)
+
+### Responsiveness
+- Desktop-first design
+- Minimum 1280px width
+- Touch-friendly controls
+- Keyboard shortcuts for trading
+
+### Feedback
+- Immediate order confirmation
+- Live P&L updates
+- Visual breach indicators
+- Sound alerts for critical events

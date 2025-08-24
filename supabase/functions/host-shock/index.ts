@@ -1,178 +1,297 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-import { corsHeaders } from '../_shared/cors.ts';
-
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { corsHeaders } from '../_shared/cors.ts'
 
 interface ShockRequest {
   sessionId: string;
-  dF_pct?: number;  // Futures price shock percentage
-  dVol_pts?: number; // Volatility shock in points
+  priceChangePercent: number;
+  volChangePoints: number;
+  description?: string;
 }
 
 serve(async (req) => {
+  // Handle CORS
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Create Supabase client with service role
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { persistSession: false } }
+    )
 
-    // Get user from JWT
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Missing Authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Parse request
+    const { sessionId, priceChangePercent, volChangePoints, description } = await req.json() as ShockRequest
+
+    // Validate auth
+    const authHeader = req.headers.get('Authorization')!
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user } } = await supabaseAdmin.auth.getUser(token)
+    
+    if (!user) {
+      throw new Error('Μη εξουσιοδοτημένη πρόσβαση')
     }
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
-
-    if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid authentication' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const requestBody: ShockRequest = await req.json();
-
-    // Verify user is instructor for this session
-    const { data: session, error: sessionError } = await supabase
+    // Verify user is instructor of this session
+    const { data: session, error: sessionError } = await supabaseAdmin
       .from('sessions')
-      .select('id, instructor_user_id')
-      .eq('id', requestBody.sessionId)
-      .single();
+      .select('instructor_user_id, status, mode, data_config')
+      .eq('id', sessionId)
+      .single()
 
     if (sessionError || !session) {
-      return new Response(
-        JSON.stringify({ error: 'Session not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      throw new Error('Συνεδρία δεν βρέθηκε')
     }
 
-    // Check if user is instructor or has instructor role
-    const { data: participant } = await supabase
-      .from('participants')
-      .select('is_instructor')
-      .eq('session_id', requestBody.sessionId)
-      .eq('sso_user_id', user.id)
-      .single();
-
-    if (session.instructor_user_id !== user.id && !participant?.is_instructor) {
-      return new Response(
-        JSON.stringify({ error: 'Only instructors can apply shocks' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (session.instructor_user_id !== user.id) {
+      throw new Error('Μόνο ο εκπαιδευτής μπορεί να εφαρμόσει shocks')
     }
 
-    // Get latest tick
-    const { data: latestTick } = await supabase
+    if (!['active', 'paused'].includes(session.status)) {
+      throw new Error('Η συνεδρία πρέπει να είναι ενεργή για εφαρμογή shocks')
+    }
+
+    // Apply shock only to mock data providers
+    const dataConfig = session.data_config || {}
+    if (dataConfig.provider !== 'mock') {
+      throw new Error('Market shocks υποστηρίζονται μόνο σε mock data')
+    }
+
+    // Record shock event for audit
+    const { error: logError } = await supabaseAdmin
+      .from('market_shocks')
+      .insert({
+        session_id: sessionId,
+        applied_by: user.id,
+        price_change_percent: priceChangePercent,
+        vol_change_points: volChangePoints,
+        description: description || 'Market Shock',
+        applied_at: new Date().toISOString()
+      })
+
+    if (logError) {
+      console.error('Failed to log shock:', logError)
+      // Don't fail the shock application for logging issues
+    }
+
+    // Get current market data to compute shocked values
+    const { data: latestTick, error: tickError } = await supabaseAdmin
       .from('ticks')
       .select('*')
       .eq('symbol', 'BRN')
       .order('ts', { ascending: false })
       .limit(1)
-      .single();
+      .single()
 
-    if (!latestTick) {
-      return new Response(
-        JSON.stringify({ error: 'No market data available' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Apply shocks
-    const newPrice = latestTick.mid * (1 + (requestBody.dF_pct || 0) / 100);
-    const spread = latestTick.best_ask - latestTick.best_bid;
-
-    // Insert shocked tick
-    const { error: tickError } = await supabase
-      .from('ticks')
-      .insert({
-        ts: new Date().toISOString(),
-        symbol: 'BRN',
-        last: newPrice,
-        best_bid: newPrice - spread / 2,
-        best_ask: newPrice + spread / 2,
-        mid: newPrice,
-        iv_surface_snapshot_id: latestTick.iv_surface_snapshot_id
-      });
-
-    if (tickError) {
-      throw tickError;
-    }
-
-    // If volatility shock, create new IV surface
-    if (requestBody.dVol_pts) {
-      const { data: latestSurface } = await supabase
+    let currentPrice = 82.5 // Default fallback
+    let currentVol = 0.25  // Default fallback
+    
+    if (latestTick && !tickError) {
+      currentPrice = latestTick.price
+      // Get current vol from latest IV surface if available
+      const { data: ivSurface } = await supabaseAdmin
         .from('iv_surface_snapshots')
         .select('surface_json')
         .order('ts', { ascending: false })
         .limit(1)
-        .single();
-
-      if (latestSurface) {
-        const shockedSurface = JSON.parse(JSON.stringify(latestSurface.surface_json));
-        
-        // Apply vol shock to all strikes/expiries
-        for (const expiry in shockedSurface.surface) {
-          for (const strike in shockedSurface.surface[expiry]) {
-            shockedSurface.surface[expiry][strike] += requestBody.dVol_pts / 100;
-          }
-        }
-
-        const { data: newSurface } = await supabase
-          .from('iv_surface_snapshots')
-          .insert({
-            provider: 'shock',
-            surface_json: shockedSurface
-          })
-          .select('id')
-          .single();
-
-        // Update tick with new surface
-        await supabase
-          .from('ticks')
-          .update({ iv_surface_snapshot_id: newSurface?.id })
-          .eq('ts', new Date().toISOString())
-          .eq('symbol', 'BRN');
+        .single()
+      
+      if (ivSurface?.surface_json?.base_vol) {
+        currentVol = ivSurface.surface_json.base_vol
       }
     }
 
-    // Broadcast shock event via Realtime
-    const shockEvent = {
-      type: 'MARKET_SHOCK',
-      sessionId: requestBody.sessionId,
-      timestamp: new Date().toISOString(),
-      dF_pct: requestBody.dF_pct,
-      dVol_pts: requestBody.dVol_pts,
-      newPrice
-    };
+    // Calculate shocked values
+    const shockedPrice = currentPrice * (1 + priceChangePercent / 100)
+    const shockedVol = Math.max(0.05, Math.min(1.0, currentVol + volChangePoints / 100))
 
-    // Update session to trigger realtime
-    await supabase
-      .from('sessions')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', requestBody.sessionId);
+    // Create shocked market tick
+    const shockTick = {
+      ts: new Date().toISOString(),
+      symbol: 'BRN',
+      price: Number(shockedPrice.toFixed(2)),
+      bid: Number((shockedPrice - 0.01).toFixed(2)),
+      ask: Number((shockedPrice + 0.01).toFixed(2)),
+      volume: Math.floor(1000 + Math.random() * 2000), // Large volume for shock
+      is_shock: true
+    }
+
+    // Insert shocked tick
+    const { error: insertError } = await supabaseAdmin
+      .from('ticks')
+      .insert(shockTick)
+
+    if (insertError) {
+      throw new Error(`Failed to insert shock tick: ${insertError.message}`)
+    }
+
+    // Create shocked IV surface
+    const shockedSurface = {
+      ts: new Date().toISOString(),
+      provider: 'shock',
+      surface_json: {
+        base_vol: shockedVol,
+        shock_applied: true,
+        price_change: priceChangePercent,
+        vol_change: volChangePoints,
+        strikes: generateShockedSurface(shockedPrice, shockedVol)
+      }
+    }
+
+    const { error: surfaceError } = await supabaseAdmin
+      .from('iv_surface_snapshots')
+      .insert(shockedSurface)
+
+    if (surfaceError) {
+      console.error('Failed to insert shocked surface:', surfaceError)
+      // Don't fail for surface insertion issues
+    }
+
+    // Broadcast shock to all session participants
+    const shockEvent = {
+      type: 'broadcast',
+      event: 'SHOCK',
+      payload: {
+        sessionId,
+        priceChange: priceChangePercent,
+        volChange: volChangePoints,
+        description: description || 'Market Shock',
+        newPrice: shockedPrice,
+        newVol: shockedVol,
+        timestamp: new Date().toISOString()
+      }
+    }
+
+    await supabaseAdmin
+      .channel(`session:${sessionId}`)
+      .send(shockEvent)
+
+    // Also broadcast the market tick
+    const tickEvent = {
+      type: 'broadcast',
+      event: 'TICK',
+      payload: {
+        symbol: 'BRN',
+        price: shockedPrice,
+        bid: shockTick.bid,
+        ask: shockTick.ask,
+        volume: shockTick.volume,
+        timestamp: shockTick.ts,
+        isShock: true
+      }
+    }
+
+    await supabaseAdmin
+      .channel(`session:${sessionId}`)
+      .send(tickEvent)
+
+    // Trigger risk recalculation for all participants
+    await triggerRiskRecalculation(supabaseAdmin, sessionId, shockedPrice, shockedVol)
 
     return new Response(
-      JSON.stringify({
-        message: 'Shock applied successfully',
-        shock: shockEvent
+      JSON.stringify({ 
+        success: true, 
+        message: 'Market shock applied successfully',
+        shockedPrice,
+        shockedVol,
+        timestamp: new Date().toISOString()
       }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
 
   } catch (error) {
-    console.error('Shock application error:', error);
+    console.error('Host shock error:', error)
     return new Response(
-      JSON.stringify({ error: 'Failed to apply shock', details: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+      JSON.stringify({ 
+        error: error.message || 'Σφάλμα εφαρμογής market shock' 
+      }),
+      { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    )
   }
-});
+})
+
+// Helper function to generate shocked IV surface
+function generateShockedSurface(futuresPrice: number, baseVol: number) {
+  const strikes: Record<string, number> = {}
+  const atmStrike = Math.round(futuresPrice / 2.5) * 2.5
+
+  // Generate strikes around ATM
+  for (let i = -5; i <= 5; i++) {
+    const strike = atmStrike + i * 2.5
+    const moneyness = strike / futuresPrice
+    
+    // Volatility smile: higher IV for OTM options + shock effect
+    const otmAdjustment = Math.abs(1 - moneyness) * 0.15
+    const shockVolatilityBoost = 0.05 // Additional vol from shock
+    const iv = baseVol + otmAdjustment + shockVolatilityBoost
+    
+    strikes[strike.toString()] = Number(Math.max(0.05, Math.min(1.0, iv)).toFixed(4))
+  }
+
+  return strikes
+}
+
+// Helper function to trigger risk recalculation for all participants
+async function triggerRiskRecalculation(
+  supabaseAdmin: any, 
+  sessionId: string, 
+  newPrice: number, 
+  newVol: number
+) {
+  try {
+    // Get all participants in session
+    const { data: participants, error } = await supabaseAdmin
+      .from('participants')
+      .select('id')
+      .eq('session_id', sessionId)
+
+    if (error || !participants) {
+      console.error('Failed to get participants for risk recalc:', error)
+      return
+    }
+
+    // For each participant, we would normally trigger risk recalculation
+    // This would be done by the order-submit function or a separate risk calculation service
+    // For now, we'll just broadcast a risk update event
+    
+    const riskUpdateEvent = {
+      type: 'broadcast',
+      event: 'RISK_RECALC_REQUIRED',
+      payload: {
+        sessionId,
+        newPrice,
+        newVol,
+        timestamp: new Date().toISOString(),
+        reason: 'market_shock'
+      }
+    }
+
+    await supabaseAdmin
+      .channel(`session:${sessionId}`)
+      .send(riskUpdateEvent)
+
+  } catch (error) {
+    console.error('Failed to trigger risk recalculation:', error)
+  }
+}
+
+// Create market_shocks table migration if it doesn't exist
+/*
+CREATE TABLE IF NOT EXISTS market_shocks (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  applied_by TEXT NOT NULL,
+  price_change_percent DECIMAL(8, 4) NOT NULL,
+  vol_change_points DECIMAL(8, 4) NOT NULL,
+  description TEXT,
+  applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_market_shocks_session ON market_shocks(session_id, applied_at DESC);
+*/

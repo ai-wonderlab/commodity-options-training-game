@@ -80,6 +80,36 @@ npm run dev --workspace=@game/web
 open http://localhost:3000
 ```
 
+### Admin Quick Start
+
+For instructors and administrators:
+
+1. **Setup Supabase Backend**
+   ```bash
+   # Configure environment variables first (see Configuration section)
+   ./scripts/setup-supabase.sh
+   ```
+
+2. **Access Instructor Console**
+   ```
+   http://localhost:3000/instructor
+   ```
+
+3. **Create a Session**
+   - Click "Create Session" 
+   - Set session parameters (duration, starting capital, margin requirements)
+   - Share the session code with participants
+
+4. **Monitor & Control**
+   - View real-time player positions and P&L
+   - Apply market shocks (spot, volatility, interest rates)
+   - Export session data for analysis
+
+5. **End Session & Debrief**
+   - End session from instructor console
+   - Access debrief page: `/session/[id]/debrief`
+   - Review performance metrics and analytics
+
 ## 🔧 Configuration
 
 ### Environment Variables

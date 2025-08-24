@@ -1,0 +1,292 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  # Linting and Code Quality
+  lint:
+    name: Lint & Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run ESLint
+        run: npm run lint
+        
+      - name: TypeScript type check
+        run: npm run type-check
+
+  # Unit Tests
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: [shared, web]
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run tests for ${{ matrix.package }}
+        run: |
+          if [ "${{ matrix.package }}" = "shared" ]; then
+            cd packages/shared && npm test
+          elif [ "${{ matrix.package }}" = "web" ]; then
+            cd apps/web && npm test
+          fi
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          flags: ${{ matrix.package }}
+
+  # Quantitative Tests
+  test-quant:
+    name: Quantitative Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run Black-76 pricing tests
+        run: cd packages/shared && npm test -- black76-pricing
+      
+      - name: Run Greeks tests
+        run: cd packages/shared && npm test -- black76-greeks
+      
+      - name: Run risk engine tests
+        run: cd packages/shared && npm test -- risk
+      
+      - name: Verify put-call parity
+        run: |
+          cd packages/shared
+          npm test -- --grep "put-call parity"
+
+  # Build
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint, test-unit]
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build packages
+        run: npm run build
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts
+          path: |
+            apps/web/.next
+            packages/shared/dist
+
+  # Supabase Migrations Check
+  supabase-check:
+    name: Supabase Migrations Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN || '' }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF || '' }}
+    steps:
+      - uses: actions/checkout@v3
+      
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      
+      - name: Validate migrations
+        run: |
+          supabase db lint --linked
+      
+      - name: Check migration conflicts
+        run: |
+          # Check for conflicting migrations
+          MIGRATION_COUNT=$(ls -1 supabase/migrations/*.sql | wc -l)
+          echo "Found $MIGRATION_COUNT migration files"
+
+  # Deploy to Staging (develop branch)
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build, test-quant]
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN || '' }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF || '' }}
+    steps:
+      - uses: actions/checkout@v3
+      
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      
+      - name: Deploy Supabase Functions
+        run: |
+          supabase functions deploy session-create --project-ref ${{ env.SUPABASE_PROJECT_REF }}
+          supabase functions deploy session-join --project-ref ${{ env.SUPABASE_PROJECT_REF }}
+          supabase functions deploy session-state --project-ref ${{ env.SUPABASE_PROJECT_REF }}
+          supabase functions deploy order-submit --project-ref ${{ env.SUPABASE_PROJECT_REF }}
+          supabase functions deploy host-shock --project-ref ${{ env.SUPABASE_PROJECT_REF }}
+          supabase functions deploy export-csv --project-ref ${{ env.SUPABASE_PROJECT_REF }}
+      
+      - name: Run database migrations
+        run: |
+          supabase db push --project-ref ${{ env.SUPABASE_PROJECT_REF }}
+
+  # Deploy to Production (main branch)
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build, test-quant]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build-artifacts
+      
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./apps/web/out
+          cname: commodity-options.training # If you have a custom domain
+
+  # Security Scan
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Run npm audit
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+      
+      - name: Run Snyk Security Scan
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN || '' }}
+
+  # Performance Tests
+  performance:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run performance benchmarks
+        run: |
+          cd packages/shared
+          npm test -- --grep "Performance" --reporter json > perf-results.json
+      
+      - name: Comment PR with results
+        uses: actions/github-script@v6
+        if: github.event_name == 'pull_request'
+        with:
+          script: |
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('packages/shared/perf-results.json', 'utf8'));
+            
+            const comment = `## Performance Test Results
+            
+            Black-76 Pricing: ${results.pricing}ms per calculation
+            Greeks Calculation: ${results.greeks}ms per calculation
+            VaR Calculation: ${results.var}ms per portfolio
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  # Compliance Check
+  compliance:
+    name: Compliance & Documentation Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Check for compliance banners
+        run: |
+          echo "Checking for required compliance text..."
+          grep -r "Education only" apps/web/components || echo "Warning: Missing education disclaimer"
+          grep -r "15-min delayed" apps/web/components || echo "Warning: Missing data delay notice"
+          grep -r "GDPR" apps/web/components || echo "Warning: Missing GDPR notice"
+      
+      - name: Verify EU hosting configuration
+        run: |
+          grep -q "region.*eu" supabase/config.toml || echo "Warning: Not configured for EU region"
+      
+      - name: Check documentation
+        run: |
+          test -f README.md || exit 1
+          test -f docs/DEPLOYMENT.md || echo "Warning: Missing deployment docs"
+          test -f docs/SUPABASE_SETUP.md || echo "Warning: Missing Supabase setup docs"

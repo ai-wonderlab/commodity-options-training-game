@@ -2,6 +2,7 @@ import './globals.css';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from '../components/AuthProvider';
 import AuthButton from '../components/AuthButton';
+import QuickNav from '../components/QuickNav';
 
 export const metadata = {
   title: 'Commodity Options Training Game - ICE Brent',
@@ -49,6 +50,7 @@ export default function RootLayout({
               },
             }}
           />
+          <QuickNav />
         </AuthProvider>
       </body>
     </html>

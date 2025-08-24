@@ -1,0 +1,217 @@
+# Quantitative Finance Rules
+
+## Black-76 Formula (European Options on Futures)
+
+### Price Formula
+```typescript
+// Call option
+C = exp(-r*T) * (F * N(d1) - K * N(d2))
+
+// Put option  
+P = exp(-r*T) * (K * N(-d2) - F * N(-d1))
+
+// Where:
+d1 = (ln(F/K) + 0.5 * σ² * T) / (σ * √T)
+d2 = d1 - σ * √T
+
+// F = Futures price
+// K = Strike price
+// T = Time to expiry (years)
+// σ = Implied volatility
+// r = Risk-free rate
+// N(x) = Cumulative normal distribution
+```
+
+### Greeks Formulas
+
+#### Delta (∂V/∂F)
+```typescript
+// Call Delta
+Δc = exp(-r*T) * N(d1)
+
+// Put Delta
+Δp = -exp(-r*T) * N(-d1)
+```
+
+#### Gamma (∂²V/∂F²)
+```typescript
+// Same for calls and puts
+Γ = exp(-r*T) * φ(d1) / (F * σ * √T)
+
+// Where φ(x) = standard normal PDF
+```
+
+#### Vega (∂V/∂σ)
+```typescript
+// Same for calls and puts (in percent)
+ν = F * exp(-r*T) * φ(d1) * √T / 100
+```
+
+#### Theta (∂V/∂T) - Use Finite Difference
+```typescript
+// Forward difference with 1 day
+Θ = -(V(T - 1/365) - V(T)) / (1/365)
+
+// More accurate: Central difference
+Θ = -(V(T + h) - V(T - h)) / (2*h)
+// where h = 1/365
+```
+
+#### Vanna (∂²V/∂F∂σ)
+```typescript
+// Cross-partial derivative
+Vanna = -exp(-r*T) * φ(d1) * d2 / σ
+```
+
+#### Vomma/Volga (∂²V/∂σ²)
+```typescript
+// Second derivative w.r.t. volatility
+Vomma = Vega * d1 * d2 / σ
+```
+
+## Portfolio Greeks Aggregation
+
+```typescript
+// Sum weighted by position size and contract multiplier
+PortfolioDelta = Σ(Δᵢ * qtyᵢ * multiplierᵢ)
+PortfolioGamma = Σ(Γᵢ * qtyᵢ * multiplierᵢ)
+PortfolioVega = Σ(νᵢ * qtyᵢ * multiplierᵢ)
+
+// Theta via finite difference on portfolio value
+PortfolioTheta = -(PV(t+dt) - PV(t)) / dt
+```
+
+## VaR Calculation (95% Confidence)
+
+### Scenario Grid Method
+```typescript
+// Price scenarios: -2σ, -1σ, 0, +1σ, +2σ
+// IV scenarios: -X, 0, +X (where X = IV shock size)
+
+// Total scenarios = 5 * 3 = 15
+for (const priceShock of [-2σ, -1σ, 0, +1σ, +2σ]) {
+  for (const ivShock of [-0.05, 0, +0.05]) {
+    scenarioValue = valuePortfolio(F * (1 + priceShock), IV + ivShock)
+    scenarioPnL = scenarioValue - currentValue
+  }
+}
+
+// Sort P&Ls and take 5th percentile
+VaR95 = -percentile(scenarioPnLs, 5)
+```
+
+## Invariants & Tests
+
+### Put-Call Parity
+```typescript
+// Must hold for European options
+C - P = exp(-r*T) * (F - K)
+
+// Test tolerance: < 0.01
+assert(Math.abs((C - P) - exp(-r*T) * (F - K)) < 0.01)
+```
+
+### Greeks Relationships
+```typescript
+// Gamma should be positive for long positions
+assert(Gamma >= 0)
+
+// Vega should be positive for long positions  
+assert(Vega >= 0)
+
+// Delta bounds
+assert(-1 <= PutDelta <= 0)
+assert(0 <= CallDelta <= 1)
+```
+
+### Finite Difference Convergence
+```typescript
+// Theta should converge as step size decreases
+const theta1 = calculateTheta(dt = 1/365)
+const theta2 = calculateTheta(dt = 0.5/365)
+const theta3 = calculateTheta(dt = 0.25/365)
+
+// Richardson extrapolation
+const thetaExtrapolated = (4*theta3 - theta2) / 3
+assert(Math.abs(theta3 - thetaExtrapolated) < tolerance)
+```
+
+## Numerical Stability
+
+### Small Time Handling
+```typescript
+if (T < 1/365) {
+  // Near expiry: use intrinsic value
+  return Math.max(0, payoff) * exp(-r*T)
+}
+```
+
+### Volatility Bounds
+```typescript
+// Enforce reasonable IV bounds
+const MIN_IV = 0.01  // 1%
+const MAX_IV = 5.00  // 500%
+iv = Math.max(MIN_IV, Math.min(MAX_IV, iv))
+```
+
+### Division by Zero Protection
+```typescript
+// Protect against zero volatility or time
+if (sigma <= 0 || T <= 0) {
+  return intrinsicValue * exp(-r * Math.max(T, 0))
+}
+```
+
+## Constants
+
+```typescript
+// Contract specifications
+const CONTRACT_MULTIPLIER = 1000  // 1000 barrels per contract
+const TICK_SIZE = 0.01            // Minimum price movement
+const TRADING_DAYS_PER_YEAR = 252 // For annualization
+
+// Risk limits (defaults)
+const DEFAULT_DELTA_CAP = 10000
+const DEFAULT_GAMMA_CAP = 1000
+const DEFAULT_VEGA_CAP = 50000
+const DEFAULT_THETA_CAP = 10000
+const DEFAULT_VAR_LIMIT = 100000
+
+// Normal distribution constants
+const SQRT_2PI = Math.sqrt(2 * Math.PI)
+```
+
+## Helper Functions
+
+### Normal CDF (Cumulative Distribution)
+```typescript
+function normalCdf(x: number): number {
+  // Approximation using error function
+  return 0.5 * (1 + erf(x / Math.sqrt(2)))
+}
+
+function erf(x: number): number {
+  // Abramowitz and Stegun approximation
+  const a1 =  0.254829592
+  const a2 = -0.284496736
+  const a3 =  1.421413741
+  const a4 = -1.453152027
+  const a5 =  1.061405429
+  const p  =  0.3275911
+
+  const sign = x < 0 ? -1 : 1
+  x = Math.abs(x)
+
+  const t = 1.0 / (1.0 + p * x)
+  const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x)
+
+  return sign * y
+}
+```
+
+### Normal PDF (Probability Density)
+```typescript
+function normalPdf(x: number): number {
+  return Math.exp(-0.5 * x * x) / SQRT_2PI
+}
+```

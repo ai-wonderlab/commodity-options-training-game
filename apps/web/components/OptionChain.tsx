@@ -1,161 +1,281 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { format } from 'date-fns';
+import React from 'react';
+import { cn, cardStyles, tableStyles, badgeStyles, formatNumber, formatPercent } from '../lib/utils';
+import { Settings, ChevronUp, ChevronDown, TrendingUp, Info } from 'lucide-react';
 
-interface OptionChainProps {
-  instruments: any[];
-  ticks: any[];
+interface Instrument {
+  symbol: string;
+  type: 'CALL' | 'PUT';
+  strike: number;
+  expiry: string;
 }
 
-export default function OptionChain({ instruments, ticks }: OptionChainProps) {
-  const [selectedExpiry, setSelectedExpiry] = useState<string>('');
-  const [showIV, setShowIV] = useState(true);
+interface Tick {
+  bid: number;
+  ask: number;
+  mid: number;
+  last?: number;
+  iv?: number;
+}
 
-  const optionInstrument = instruments?.find(i => i.type === 'OPTION');
-  const expiries = optionInstrument?.expiries || [];
+interface OptionChainProps {
+  instruments?: Instrument[];
+  ticks?: Record<string, Tick>;
+}
+
+export default function OptionChain({ instruments = [], ticks = {} }: OptionChainProps) {
+  const [selectedExpiry, setSelectedExpiry] = React.useState<string>('');
+  const [showIV, setShowIV] = React.useState(true);
+  const [sortBy, setSortBy] = React.useState<'strike' | 'volume'>('strike');
+  const [sortOrder, setSortOrder] = React.useState<'asc' | 'desc'>('asc');
   
-  const currentExpiry = selectedExpiry || expiries[0]?.date;
-  const strikes = expiries.find((e: any) => e.date === currentExpiry)?.strikes || [];
+  // Get unique expiries
+  const expiries = React.useMemo(() => {
+    const uniqueExpiries = [...new Set(instruments.map(i => i.expiry))].sort();
+    return uniqueExpiries;
+  }, [instruments]);
+  
+  // Set default expiry if not selected
+  React.useEffect(() => {
+    if (expiries.length > 0 && (!selectedExpiry || !expiries.includes(selectedExpiry))) {
+      setSelectedExpiry(expiries[0]);
+    }
+  }, [expiries, selectedExpiry]);
+  
+  // Filter instruments for selected expiry
+  const filteredInstruments = React.useMemo(() => {
+    return instruments.filter(i => i.expiry === selectedExpiry);
+  }, [instruments, selectedExpiry]);
+  
+  // Get unique strikes
+  const strikes = React.useMemo(() => {
+    const uniqueStrikes = [...new Set(filteredInstruments.map(i => i.strike))];
+    return uniqueStrikes.sort((a, b) => {
+      if (sortBy === 'strike') {
+        return sortOrder === 'asc' ? a - b : b - a;
+      }
+      return 0;
+    });
+  }, [filteredInstruments, sortBy, sortOrder]);
+  
+  // Calculate ATM strike
+  const atmStrike = React.useMemo(() => {
+    const spotPrice = ticks['BRN']?.mid || 82.50;
+    if (strikes.length === 0) return 85;
+    return strikes.reduce((prev, curr) => 
+      Math.abs(curr - spotPrice) < Math.abs(prev - spotPrice) ? curr : prev
+    );
+  }, [strikes, ticks]);
 
-  // Get current BRN price for ATM marker
-  const brnPrice = ticks?.find(t => t.symbol === 'BRN')?.mid || 82.5;
-  const atmStrike = strikes.reduce((prev, curr) => 
-    Math.abs(curr - brnPrice) < Math.abs(prev - brnPrice) ? curr : prev
-  , strikes[0]);
-
-  const formatPrice = (value: number | null) => {
+  const formatPrice = (value?: number) => {
     if (value === null || value === undefined) return '-';
     return value.toFixed(2);
   };
 
-  const formatIV = (value: number | null) => {
+  const formatIV = (value?: number) => {
     if (value === null || value === undefined) return '-';
     return (value * 100).toFixed(1) + '%';
   };
 
+  // IV visualization helper
+  const getIVBar = (iv?: number) => {
+    if (!iv) return null;
+    const ivPercent = Math.min(iv * 100, 100);
+    return (
+      <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+        <div 
+          className="h-full bg-gradient-to-r from-info to-info/60 transition-all duration-300"
+          style={{ width: `${ivPercent}%` }}
+        />
+      </div>
+    );
+  };
+
+  const toggleSort = (column: 'strike' | 'volume') => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortOrder('asc');
+    }
+  };
+
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-gray-800">
-      <div className="p-3 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-semibold text-gray-900 dark:text-white">Option Chain</h3>
-          <label className="flex items-center text-sm">
+    <div className={cn(cardStyles.base, "h-full flex flex-col")}>
+      <div className={cardStyles.header}>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-h4 font-serif font-bold text-foreground">
+              Option Chain
+            </h3>
+            <p className="text-caption text-muted-foreground mt-1">
+              EU-Style Brent Options (BUL)
+            </p>
+          </div>
+          <button className="p-2 rounded-md hover:bg-muted transition-colors">
+            <Settings className="h-5 w-5 text-muted-foreground" />
+          </button>
+        </div>
+
+        {/* Controls */}
+        <div className="flex flex-col sm:flex-row gap-3 mt-4">
+          <select
+            value={selectedExpiry}
+            onChange={(e) => setSelectedExpiry(e.target.value)}
+            className="flex-1 px-3 py-2 text-sm rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            {expiries.map((exp) => (
+              <option key={exp} value={exp}>
+                Expiry: {exp}
+              </option>
+            ))}
+          </select>
+          
+          <label className="flex items-center gap-2 px-3 py-2 text-sm rounded-md border border-input bg-background cursor-pointer hover:bg-muted transition-colors">
             <input
               type="checkbox"
               checked={showIV}
               onChange={(e) => setShowIV(e.target.checked)}
-              className="mr-2"
+              className="rounded border-input text-primary focus:ring-primary"
             />
-            Show IV
+            <span>Show IV</span>
+            <Info className="h-3 w-3 text-muted-foreground" />
           </label>
         </div>
-        <select
-          value={currentExpiry}
-          onChange={(e) => setSelectedExpiry(e.target.value)}
-          className="w-full px-3 py-1 text-sm border border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600"
-        >
-          {expiries.map((exp: any) => (
-            <option key={exp.date} value={exp.date}>
-              {format(new Date(exp.date), 'MMM dd, yyyy')}
-            </option>
-          ))}
-        </select>
       </div>
 
-      <div className="flex-1 overflow-auto option-chain-container">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-gray-50 dark:bg-gray-700">
-            <tr className="text-xs text-gray-600 dark:text-gray-400">
-              <th className="py-2 px-2 text-center" colSpan={showIV ? 5 : 4}>CALLS</th>
-              <th className="py-2 px-2 text-center bg-gray-100 dark:bg-gray-600">STRIKE</th>
-              <th className="py-2 px-2 text-center" colSpan={showIV ? 5 : 4}>PUTS</th>
-            </tr>
-            <tr className="text-xs text-gray-500 dark:text-gray-400">
-              {/* Calls */}
-              <th className="py-1 px-1">Bid</th>
-              <th className="py-1 px-1">Ask</th>
-              <th className="py-1 px-1">Last</th>
-              {showIV && <th className="py-1 px-1">IV</th>}
-              <th className="py-1 px-1">Vol</th>
-              
-              {/* Strike */}
-              <th className="py-1 px-2 bg-gray-100 dark:bg-gray-600"></th>
-              
-              {/* Puts */}
-              <th className="py-1 px-1">Bid</th>
-              <th className="py-1 px-1">Ask</th>
-              <th className="py-1 px-1">Last</th>
-              {showIV && <th className="py-1 px-1">IV</th>}
-              <th className="py-1 px-1">Vol</th>
-            </tr>
-          </thead>
-          <tbody>
-            {strikes.map((strike: number) => {
-              const isATM = strike === atmStrike;
-              const callSymbol = `BUL${strike}C${currentExpiry.slice(2)}`;
-              const putSymbol = `BUL${strike}P${currentExpiry.slice(2)}`;
-              
-              const callTick = ticks?.find(t => t.symbol === callSymbol);
-              const putTick = ticks?.find(t => t.symbol === putSymbol);
-
-              return (
-                <tr 
-                  key={strike}
-                  className={`
-                    hover:bg-gray-50 dark:hover:bg-gray-700 border-t border-gray-100 dark:border-gray-700
-                    ${isATM ? 'bg-blue-50 dark:bg-blue-900/20 font-semibold' : ''}
-                  `}
+      {/* Table */}
+      <div className="flex-1 overflow-auto">
+        <div className={tableStyles.wrapper}>
+          <table className={tableStyles.table}>
+            <thead className={cn(tableStyles.header, "sticky top-0 bg-background z-10")}>
+              <tr className={tableStyles.headerRow}>
+                <th colSpan={showIV ? 5 : 4} className="text-center py-3 font-serif text-success">
+                  CALLS
+                </th>
+                <th 
+                  className="text-center py-3 bg-muted font-serif cursor-pointer hover:bg-muted/80"
+                  onClick={() => toggleSort('strike')}
                 >
-                  {/* Calls */}
-                  <td className="py-1 px-1 text-right mono-num text-green-600">
-                    {formatPrice(callTick?.best_bid)}
-                  </td>
-                  <td className="py-1 px-1 text-right mono-num text-green-600">
-                    {formatPrice(callTick?.best_ask)}
-                  </td>
-                  <td className="py-1 px-1 text-right mono-num">
-                    {formatPrice(callTick?.last)}
-                  </td>
-                  {showIV && (
-                    <td className="py-1 px-1 text-right mono-num text-gray-500">
-                      {formatIV(0.25)}
+                  <div className="flex items-center justify-center gap-1">
+                    STRIKE
+                    {sortBy === 'strike' && (
+                      sortOrder === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                    )}
+                  </div>
+                </th>
+                <th colSpan={showIV ? 5 : 4} className="text-center py-3 font-serif text-destructive">
+                  PUTS
+                </th>
+              </tr>
+              <tr className="text-xs text-muted-foreground">
+                {/* Calls */}
+                <th className={tableStyles.headerCell}>Bid</th>
+                <th className={tableStyles.headerCell}>Ask</th>
+                <th className={tableStyles.headerCell}>Mid</th>
+                {showIV && <th className={tableStyles.headerCell}>IV</th>}
+                <th className={tableStyles.headerCell}>Vol</th>
+                
+                {/* Strike */}
+                <th className="bg-muted"></th>
+                
+                {/* Puts */}
+                <th className={tableStyles.headerCell}>Bid</th>
+                <th className={tableStyles.headerCell}>Ask</th>
+                <th className={tableStyles.headerCell}>Mid</th>
+                {showIV && <th className={tableStyles.headerCell}>IV</th>}
+                <th className={tableStyles.headerCell}>Vol</th>
+              </tr>
+            </thead>
+            <tbody className={tableStyles.body}>
+              {strikes.map((strike) => {
+                const isATM = strike === atmStrike;
+                const callSymbol = `BUL-${selectedExpiry}-C-${strike}`;
+                const putSymbol = `BUL-${selectedExpiry}-P-${strike}`;
+                
+                const callTick = ticks[callSymbol];
+                const putTick = ticks[putSymbol];
+                const volume = Math.floor(Math.random() * 100);
+
+                return (
+                  <tr 
+                    key={strike}
+                    className={cn(
+                      tableStyles.row,
+                      "transition-all duration-200",
+                      isATM && "bg-primary/5 dark:bg-primary/10 font-semibold animate-fade-in"
+                    )}
+                  >
+                    {/* Calls */}
+                    <td className={cn(tableStyles.cell, "text-right font-mono text-success")}>
+                      {formatPrice(callTick?.bid)}
                     </td>
-                  )}
-                  <td className="py-1 px-1 text-right mono-num text-gray-500">
-                    {Math.floor(Math.random() * 100)}
-                  </td>
-                  
-                  {/* Strike */}
-                  <td className={`
-                    py-1 px-2 text-center mono-num font-bold bg-gray-100 dark:bg-gray-600
-                    ${isATM ? 'text-blue-600 dark:text-blue-400' : ''}
-                  `}>
-                    {strike.toFixed(1)}
-                  </td>
-                  
-                  {/* Puts */}
-                  <td className="py-1 px-1 text-right mono-num text-red-600">
-                    {formatPrice(putTick?.best_bid)}
-                  </td>
-                  <td className="py-1 px-1 text-right mono-num text-red-600">
-                    {formatPrice(putTick?.best_ask)}
-                  </td>
-                  <td className="py-1 px-1 text-right mono-num">
-                    {formatPrice(putTick?.last)}
-                  </td>
-                  {showIV && (
-                    <td className="py-1 px-1 text-right mono-num text-gray-500">
-                      {formatIV(0.28)}
+                    <td className={cn(tableStyles.cell, "text-right font-mono text-success/80")}>
+                      {formatPrice(callTick?.ask)}
                     </td>
-                  )}
-                  <td className="py-1 px-1 text-right mono-num text-gray-500">
-                    {Math.floor(Math.random() * 100)}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    <td className={cn(tableStyles.cell, "text-right font-mono")}>
+                      {formatPrice(callTick?.mid)}
+                    </td>
+                    {showIV && (
+                      <td className={cn(tableStyles.cell, "px-2")}>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-xs text-muted-foreground">
+                            {formatIV(callTick?.iv)}
+                          </span>
+                          {getIVBar(callTick?.iv)}
+                        </div>
+                      </td>
+                    )}
+                    <td className={cn(tableStyles.cell, "text-right text-muted-foreground")}>
+                      {volume}
+                    </td>
+                    
+                    {/* Strike */}
+                    <td className={cn(
+                      tableStyles.cell,
+                      "text-center font-mono font-bold bg-muted",
+                      isATM && "bg-primary text-primary-foreground"
+                    )}>
+                      <div className="flex items-center justify-center gap-1">
+                        {strike.toFixed(0)}
+                        {isATM && (
+                          <span className={cn(badgeStyles.base, badgeStyles.variants.default, "text-xs py-0 px-1")}>
+                            ATM
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    
+                    {/* Puts */}
+                    <td className={cn(tableStyles.cell, "text-right font-mono text-destructive")}>
+                      {formatPrice(putTick?.bid)}
+                    </td>
+                    <td className={cn(tableStyles.cell, "text-right font-mono text-destructive/80")}>
+                      {formatPrice(putTick?.ask)}
+                    </td>
+                    <td className={cn(tableStyles.cell, "text-right font-mono")}>
+                      {formatPrice(putTick?.mid)}
+                    </td>
+                    {showIV && (
+                      <td className={cn(tableStyles.cell, "px-2")}>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-xs text-muted-foreground">
+                            {formatIV(putTick?.iv)}
+                          </span>
+                          {getIVBar(putTick?.iv)}
+                        </div>
+                      </td>
+                    )}
+                    <td className={cn(tableStyles.cell, "text-right text-muted-foreground")}>
+                      {volume}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

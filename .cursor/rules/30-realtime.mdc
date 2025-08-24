@@ -1,0 +1,345 @@
+# Realtime Communication Rules
+
+## Channel Structure
+
+### Main Session Channel
+```typescript
+// Channel name format
+const channelName = `session:${sessionId}`
+
+// Subscribe from client
+const channel = supabase
+  .channel(channelName)
+  .on('broadcast', { event: '*' }, handleEvent)
+  .subscribe((status) => {
+    if (status === 'SUBSCRIBED') {
+      console.log('Connected to session')
+    }
+  })
+```
+
+## Event Types & Payloads
+
+### Market Tick Event
+```typescript
+interface TickEvent {
+  type: 'broadcast'
+  event: 'TICK'
+  payload: {
+    symbol: string
+    price: number
+    bid: number
+    ask: number
+    volume?: number
+    timestamp: string
+  }
+}
+```
+
+### Order Fill Event
+```typescript
+interface FillEvent {
+  type: 'broadcast'
+  event: 'FILL'
+  payload: {
+    orderId: string
+    participantId: string
+    side: 'BUY' | 'SELL'
+    symbol: string
+    quantity: number
+    fillPrice: number
+    fees: number
+    timestamp: string
+  }
+}
+```
+
+### Risk Update Event
+```typescript
+interface RiskEvent {
+  type: 'broadcast'
+  event: 'RISK'
+  payload: {
+    participantId: string
+    greeks: {
+      delta: number
+      gamma: number
+      vega: number
+      theta: number
+    }
+    var95: number
+    breaches: string[]
+    timestamp: string
+  }
+}
+```
+
+### Score Update Event
+```typescript
+interface ScoreEvent {
+  type: 'broadcast'
+  event: 'SCORE'
+  payload: {
+    participantId: string
+    realizedPnL: number
+    unrealizedPnL: number
+    score: number
+    rank: number
+    timestamp: string
+  }
+}
+```
+
+### Alert Event
+```typescript
+interface AlertEvent {
+  type: 'broadcast'
+  event: 'ALERT'
+  payload: {
+    participantId?: string  // Optional, omit for global
+    severity: 'info' | 'warning' | 'critical'
+    type: 'breach_open' | 'breach_close' | 'margin_call' | 'shock'
+    message: string
+    details?: any
+    timestamp: string
+  }
+}
+```
+
+### Instructor Control Events
+```typescript
+interface ShockEvent {
+  type: 'broadcast'
+  event: 'SHOCK'
+  payload: {
+    priceChange: number  // Percentage
+    volChange: number    // Points
+    timestamp: string
+  }
+}
+
+interface SessionControlEvent {
+  type: 'broadcast'
+  event: 'SESSION_CONTROL'
+  payload: {
+    action: 'pause' | 'resume' | 'freeze' | 'end'
+    timestamp: string
+  }
+}
+```
+
+## Broadcasting from Edge Functions
+
+```typescript
+// From Supabase Edge Function
+const supabaseAdmin = createClient(
+  Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+)
+
+// Broadcast to all participants
+await supabaseAdmin
+  .channel(`session:${sessionId}`)
+  .send({
+    type: 'broadcast',
+    event: 'TICK',
+    payload: {
+      symbol: 'BRN',
+      price: 82.50,
+      bid: 82.48,
+      ask: 82.52,
+      timestamp: new Date().toISOString()
+    }
+  })
+```
+
+## Client-Side Event Handling
+
+```typescript
+// Centralized event handler
+function handleRealtimeEvent(payload: any) {
+  switch (payload.event) {
+    case 'TICK':
+      updateMarketData(payload.payload)
+      break
+    
+    case 'FILL':
+      if (payload.payload.participantId === myId) {
+        updateMyPositions(payload.payload)
+        showFillNotification(payload.payload)
+      }
+      break
+    
+    case 'RISK':
+      if (payload.payload.participantId === myId) {
+        updateRiskMeters(payload.payload)
+      }
+      break
+    
+    case 'SCORE':
+      updateLeaderboard(payload.payload)
+      break
+    
+    case 'ALERT':
+      if (!payload.payload.participantId || 
+          payload.payload.participantId === myId) {
+        showAlert(payload.payload)
+      }
+      break
+    
+    case 'SHOCK':
+      handleMarketShock(payload.payload)
+      break
+    
+    case 'SESSION_CONTROL':
+      handleSessionControl(payload.payload)
+      break
+  }
+}
+```
+
+## Subscription Management
+
+```typescript
+class RealtimeManager {
+  private channel: RealtimeChannel | null = null
+  private reconnectAttempts = 0
+  private maxReconnectAttempts = 5
+  
+  async connect(sessionId: string) {
+    // Clean up existing connection
+    if (this.channel) {
+      await this.disconnect()
+    }
+    
+    this.channel = supabase
+      .channel(`session:${sessionId}`)
+      .on('broadcast', { event: '*' }, this.handleEvent.bind(this))
+      .on('system', { event: '*' }, this.handleSystemEvent.bind(this))
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Realtime connected')
+          this.reconnectAttempts = 0
+        } else if (status === 'CHANNEL_ERROR') {
+          await this.handleError()
+        } else if (status === 'TIMED_OUT') {
+          await this.reconnect()
+        }
+      })
+  }
+  
+  async disconnect() {
+    if (this.channel) {
+      await supabase.removeChannel(this.channel)
+      this.channel = null
+    }
+  }
+  
+  private async reconnect() {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error('Max reconnect attempts reached')
+      return
+    }
+    
+    this.reconnectAttempts++
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000)
+    
+    setTimeout(() => {
+      console.log(`Reconnecting... (attempt ${this.reconnectAttempts})`)
+      this.connect(this.sessionId)
+    }, delay)
+  }
+}
+```
+
+## Rate Limiting & Throttling
+
+```typescript
+// Throttle updates to prevent overwhelming the UI
+class ThrottledUpdater {
+  private updateQueue: Map<string, any> = new Map()
+  private updateInterval: NodeJS.Timeout | null = null
+  private throttleMs = 100  // Max 10 updates per second
+  
+  constructor(throttleMs: number = 100) {
+    this.throttleMs = throttleMs
+  }
+  
+  queueUpdate(key: string, data: any) {
+    this.updateQueue.set(key, data)
+    
+    if (!this.updateInterval) {
+      this.updateInterval = setInterval(() => {
+        this.processQueue()
+      }, this.throttleMs)
+    }
+  }
+  
+  private processQueue() {
+    if (this.updateQueue.size === 0) {
+      if (this.updateInterval) {
+        clearInterval(this.updateInterval)
+        this.updateInterval = null
+      }
+      return
+    }
+    
+    // Process all queued updates
+    const updates = Array.from(this.updateQueue.entries())
+    this.updateQueue.clear()
+    
+    updates.forEach(([key, data]) => {
+      this.applyUpdate(key, data)
+    })
+  }
+  
+  private applyUpdate(key: string, data: any) {
+    // Apply the update to the UI
+    switch (key) {
+      case 'marketData':
+        updateMarketDisplay(data)
+        break
+      case 'positions':
+        updatePositionsTable(data)
+        break
+      case 'leaderboard':
+        updateLeaderboardDisplay(data)
+        break
+    }
+  }
+}
+```
+
+## Best Practices
+
+### Connection Management
+- Always clean up subscriptions on unmount
+- Implement exponential backoff for reconnects
+- Handle network interruptions gracefully
+- Show connection status to users
+
+### Performance
+- Throttle UI updates (max 10/sec)
+- Batch related updates together
+- Use requestAnimationFrame for smooth animations
+- Debounce rapid state changes
+
+### Security
+- Validate all incoming payloads
+- Never trust client-sent participant IDs
+- Use server-side validation for all broadcasts
+- Rate limit broadcasts per session
+
+### Error Handling
+```typescript
+try {
+  await channel.send({
+    type: 'broadcast',
+    event: eventType,
+    payload: data
+  })
+} catch (error) {
+  console.error('Broadcast failed:', error)
+  // Queue for retry or notify user
+}
+```

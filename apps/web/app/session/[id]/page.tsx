@@ -116,11 +116,11 @@ export default function SessionPage() {
     <div className="h-[calc(100vh-120px)] flex">
       {/* Left Panel - Futures & Option Chain */}
       <div className="w-1/3 border-r border-gray-200 dark:border-gray-700 flex flex-col">
-        <MarketData ticks={sessionData.ticksLatest} />
+        <MarketData ticks={sessionData.ticksLatest || {}} />
         <div className="flex-1 overflow-hidden">
           <OptionChain 
-            instruments={sessionData.session.instruments}
-            ticks={sessionData.ticksLatest}
+            instruments={sessionData.session?.instruments || []}
+            ticks={sessionData.ticksLatest || {}}
           />
         </div>
       </div>

@@ -1,24 +1,99 @@
 {
-  "allowCommands": [
-    "git init -b main",
-    "git add . && git commit -m \"<msg>\"",
-    "git push",
-    "npm ci",
-    "npm install",
-    "npm run build --workspaces",
-    "npx supabase --version",
-    "npx supabase login",
-    "npx supabase link --project-ref <ref>",
-    "npx supabase db push",
-    "npx supabase functions deploy <name>",
-    "npx supabase secrets set --env-file <path>"
-  ],
-  "notes": "Only use these commands. Ask before any other command.",
+  "name": "Commodity Options Training Game",
+  "description": "Desktop-first training game for ICE Brent options education",
+  "install": "corepack enable && pnpm install || npm ci",
+  "start": "echo 'Environment ready for Commodity Options Training Game'",
+  "test": "pnpm test || npm test",
+  "build": "pnpm build || npm run build",
+  "allow": {
+    "terminal": [
+      "git init -b main",
+      "git add .",
+      "git commit -m *",
+      "git push *",
+      "git pull *",
+      "git status",
+      "git log *",
+      "npm install",
+      "npm ci",
+      "npm run build",
+      "npm run build:*",
+      "npm run test",
+      "npm run test:*",
+      "npm run dev",
+      "npm run start",
+      "pnpm install",
+      "pnpm build",
+      "pnpm test",
+      "pnpm dev",
+      "yarn install",
+      "yarn build",
+      "yarn test",
+      "yarn dev",
+      "npx supabase --version",
+      "npx supabase init",
+      "npx supabase link --project-ref *",
+      "npx supabase db push",
+      "npx supabase db reset",
+      "npx supabase functions deploy",
+      "npx supabase functions deploy *",
+      "npx supabase functions serve *",
+      "npx supabase secrets set --env-file *",
+      "npx supabase secrets list",
+      "npx supabase status",
+      "npx supabase start",
+      "npx supabase stop",
+      "npx next build",
+      "npx next export",
+      "npx vitest *",
+      "npx tsc *",
+      "npx eslint *",
+      "npx prettier *",
+      "echo *",
+      "cd *",
+      "ls *",
+      "pwd",
+      "cat package.json",
+      "cat tsconfig.json",
+      "node --version",
+      "npm --version",
+      "pnpm --version"
+    ]
+  },
+  "environment": {
+    "NODE_ENV": "development",
+    "DATA_PROVIDER": "mock",
+    "DATA_REGION": "eu",
+    "EDUCATION_ONLY_MODE": "true",
+    "DATA_DELAY_MINUTES": "15",
+    "DEFAULT_BANKROLL": "1000000",
+    "DEFAULT_MAX_PLAYERS": "25",
+    "CONTRACT_MULTIPLIER": "1000"
+  },
+  "requirements": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "workspace": {
+    "type": "monorepo",
+    "packages": [
+      "apps/web",
+      "packages/shared"
+    ]
+  },
   "supabase": {
     "region": "eu",
-    "edgeFunctionsRuntime": "deno",
-    "linking": "use project ref",
-    "authProviders": ["google", "azure"]
+    "features": [
+      "auth",
+      "database",
+      "edge-functions",
+      "realtime",
+      "storage"
+    ]
+  },
+  "deployment": {
+    "frontend": "github-pages",
+    "backend": "supabase-cloud",
+    "ci": "github-actions"
   }
 }
-

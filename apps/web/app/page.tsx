@@ -94,12 +94,22 @@ export default function HomePage() {
   return (
     <div className="min-h-[calc(100vh-120px)] flex items-center justify-center p-8">
       <div className="max-w-4xl w-full">
-        <div className="text-center mb-8">
-          <h2 className="text-4xl font-black bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-3">
-            ICE Brent Options Training
-          </h2>
-          <p className="text-lg text-gray-600 dark:text-gray-400">
-            Practice trading EU-style Brent options with Black-76 pricing
+        <div className="text-center mb-12">
+          <div className="mb-6">
+            <span className="inline-block px-4 py-1 text-xs font-semibold text-blue-600 bg-blue-100 rounded-full mb-4">
+              EDUCATIONAL PLATFORM
+            </span>
+          </div>
+          <h1 className="text-5xl font-black mb-4">
+            <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              ICE Brent Options
+            </span>
+            <span className="block text-3xl mt-2 text-gray-700 dark:text-gray-300">
+              Training Game
+            </span>
+          </h1>
+          <p className="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+            Master EU-style Brent options trading with Black-76 pricing model
           </p>
         </div>
 
@@ -277,9 +287,27 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
-          <p>Contract: 1,000 bbl • Tick: $0.01/bbl • European exercise</p>
-          <p>Model: Black-76 • Greeks: Δ, Γ, ν, Θ, Vanna, Vomma</p>
+        <div className="mt-12 grid grid-cols-3 gap-6 text-center">
+          <div className="p-4">
+            <div className="text-3xl mb-2">📊</div>
+            <h3 className="font-semibold text-gray-800 dark:text-gray-200">Real-time Trading</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Live market simulation</p>
+          </div>
+          <div className="p-4">
+            <div className="text-3xl mb-2">🎯</div>
+            <h3 className="font-semibold text-gray-800 dark:text-gray-200">Risk Management</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Greeks & VaR tracking</p>
+          </div>
+          <div className="p-4">
+            <div className="text-3xl mb-2">🏆</div>
+            <h3 className="font-semibold text-gray-800 dark:text-gray-200">Leaderboard</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Compete with others</p>
+          </div>
+        </div>
+        
+        <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-700 text-center text-sm text-gray-500 dark:text-gray-400">
+          <p className="font-mono">Contract: 1,000 bbl • Tick: $0.01/bbl • European exercise</p>
+          <p className="font-mono mt-1">Model: Black-76 • Greeks: Δ, Γ, ν, Θ, Vanna, Vomma</p>
         </div>
       </div>
     </div>
