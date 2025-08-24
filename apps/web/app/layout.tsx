@@ -1,23 +1,29 @@
-export const metadata = {
-  title: 'Commodity Options Training Game',
-  description: 'Education-only training game for ICE Brent options (Black-76).',
-};
+import './globals.css'
+import { Inter } from 'next/font/google'
+import type { Metadata } from 'next'
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+const inter = Inter({ subsets: ['latin'] })
+
+export const metadata: Metadata = {
+  title: 'Commodity Options Training Game - ICE Brent',
+  description: 'Professional options trading simulator for ICE Brent crude oil futures and options. Education only.',
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
     <html lang="en">
-      <body style={{ fontFamily: 'Inter, system-ui, Arial, sans-serif', color: '#0f172a' }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px' }}>
-          <header style={{ marginBottom: 24 }}>
-            <h1 style={{ fontSize: 24, fontWeight: 700 }}>Commodity Options Training Game</h1>
-            <p style={{ fontSize: 12, color: '#334155' }}>
-              Education only. Prices are delayed placeholders. EU data residency only. ICE delayed
-              attribution placeholder.
-            </p>
-          </header>
-          <main>{children}</main>
+      <body className={inter.className}>
+        <div className="min-h-screen bg-gray-50">
+          {children}
+        </div>
+        <div className="fixed bottom-2 right-2 text-xs text-gray-500 bg-white/80 px-2 py-1 rounded">
+          Education only • 15-min delayed • EU data residency
         </div>
       </body>
     </html>
-  );
+  )
 }
