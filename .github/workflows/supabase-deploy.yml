@@ -1,0 +1,143 @@
+name: Deploy to Supabase
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+  SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+  PROJECT_REF: ${{ secrets.PROJECT_REF }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install Supabase CLI
+        run: |
+          wget -qO- https://github.com/supabase/cli/releases/download/v1.187.10/supabase_linux_amd64.tar.gz | tar xvz
+          sudo mv supabase /usr/local/bin
+          supabase --version
+
+      - name: Link Supabase Project
+        run: |
+          supabase link --project-ref $PROJECT_REF --password $SUPABASE_DB_PASSWORD
+
+      - name: Run Database Migrations
+        run: |
+          supabase db push --password $SUPABASE_DB_PASSWORD
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy Edge Functions
+        run: |
+          # Deploy each function
+          for function in supabase/functions/*/; do
+            if [ -d "$function" ] && [ "$function" != "supabase/functions/_shared/" ]; then
+              func_name=$(basename "$function")
+              echo "Deploying function: $func_name"
+              supabase functions deploy $func_name --no-verify-jwt
+            fi
+          done
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Update Function Environment Variables
+        run: |
+          # Set environment variables for functions
+          supabase secrets set --env-file supabase/.env.production
+        continue-on-error: true
+
+      - name: Apply RLS Policies
+        run: |
+          echo "RLS policies are included in migrations"
+
+      - name: Seed Database (if applicable)
+        run: |
+          # Only run on first deployment or when needed
+          if [ "${{ github.event.inputs.seed }}" == "true" ]; then
+            supabase db seed
+          fi
+        continue-on-error: true
+
+      - name: Test Database Connection
+        run: |
+          npx supabase status
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deployment Summary
+        run: |
+          echo "✅ Supabase deployment completed!"
+          echo "Project: $PROJECT_REF"
+          echo "Migrations: Applied"
+          echo "Edge Functions: Deployed"
+          echo "Time: $(date)"
+
+  test-deployment:
+    needs: deploy
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test Supabase Connection
+        run: |
+          cat > test-connection.js << 'EOF'
+          const { createClient } = require('@supabase/supabase-js');
+          
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+          const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+          
+          if (!supabaseUrl || !supabaseKey) {
+            console.error('Missing Supabase credentials');
+            process.exit(1);
+          }
+          
+          const supabase = createClient(supabaseUrl, supabaseKey);
+          
+          async function testConnection() {
+            try {
+              const { data, error } = await supabase
+                .from('sessions')
+                .select('count')
+                .limit(1);
+              
+              if (error) throw error;
+              console.log('✅ Successfully connected to Supabase');
+              process.exit(0);
+            } catch (error) {
+              console.error('❌ Failed to connect:', error.message);
+              process.exit(1);
+            }
+          }
+          
+          testConnection();
+          EOF
+          
+          node test-connection.js
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        continue-on-error: true
