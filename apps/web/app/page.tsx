@@ -93,7 +93,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-[calc(100vh-120px)] flex items-center justify-center p-8">
-      <div className="max-w-4xl w-full animate-float">
+      <div className="max-w-4xl w-full">
         <div className="text-center mb-8">
           <h2 className="text-4xl font-black bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-3">
             ICE Brent Options Training
@@ -103,7 +103,7 @@ export default function HomePage() {
           </p>
         </div>
 
-        <div className="glass rounded-2xl shadow-2xl overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
           <div className="flex border-b border-gray-200 dark:border-gray-700">
             <button
               onClick={() => setMode('join')}
