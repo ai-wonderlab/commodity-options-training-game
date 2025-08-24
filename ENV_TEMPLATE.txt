@@ -1,0 +1,29 @@
+# Supabase Configuration Template
+# Copy this to apps/web/.env.local after filling in your values
+
+# Get these from https://app.supabase.com/project/YOUR_PROJECT/settings/api
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+
+# App Configuration
+NEXT_PUBLIC_APP_NAME=Commodity Options Training Game
+NEXT_PUBLIC_APP_ENV=development
+NEXT_PUBLIC_APP_REGION=EU
+
+# Feature Flags
+NEXT_PUBLIC_ENABLE_AUTH=true
+NEXT_PUBLIC_ENABLE_REALTIME=true
+NEXT_PUBLIC_ENABLE_MOCK_DATA=false
+
+# Data Provider (mock, ice, refinitiv)
+NEXT_PUBLIC_DATA_PROVIDER=mock
+
+# Session Defaults
+NEXT_PUBLIC_DEFAULT_BANKROLL=100000
+NEXT_PUBLIC_DEFAULT_VAR_LIMIT=5000
+
+# Compliance
+NEXT_PUBLIC_EDUCATIONAL_ONLY=true
+NEXT_PUBLIC_DATA_DELAY_MINUTES=15
+NEXT_PUBLIC_ALLOWED_REGIONS=EU

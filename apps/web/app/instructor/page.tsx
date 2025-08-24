@@ -33,6 +33,9 @@ interface Session {
   max_players: number;
   current_players: number;
   created_at: string;
+  is_active?: boolean;
+  instructor_user_id?: string;
+  data_source?: 'mock' | 'refinitiv' | 'ice';
 }
 
 export default function InstructorPage() {
@@ -73,36 +76,42 @@ export default function InstructorPage() {
 
   const loadSessions = async () => {
     try {
-      const { data, error } = await supabase
+      // Load sessions with participant count
+      const { data: sessionsData, error: sessionsError } = await supabase
         .from('sessions')
-        .select('*')
+        .select(`
+          *,
+          participants!inner(
+            id
+          )
+        `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (sessionsError) throw sessionsError;
       
-      // Add mock current_players count
-      const sessionsWithPlayers = (data || []).map(s => ({
-        ...s,
-        current_players: Math.floor(Math.random() * s.max_players)
-      }));
+      // Get participant counts for each session
+      const sessionsWithCounts = await Promise.all(
+        (sessionsData || []).map(async (session) => {
+          const { count } = await supabase
+            .from('participants')
+            .select('*', { count: 'exact', head: true })
+            .eq('session_id', session.id);
+          
+          return {
+            ...session,
+            session_id: session.id,
+            status: session.is_active ? 'active' : 'completed',
+            max_players: 25, // Default max players
+            current_players: count || 0
+          };
+        })
+      );
       
-      setSessions(sessionsWithPlayers);
+      setSessions(sessionsWithCounts);
     } catch (error) {
       console.error('Error loading sessions:', error);
-      // Use mock data if Supabase not configured
-      setSessions([
-        {
-          id: '1',
-          session_id: 'TEST-SESSION-' + Date.now(),
-          mode: 'live',
-          status: 'active',
-          bankroll: 100000,
-          var_limit: 5000,
-          max_players: 25,
-          current_players: 12,
-          created_at: new Date().toISOString(),
-        }
-      ]);
+      toast.error('Failed to load sessions. Please check Supabase configuration.');
+      setSessions([]);
     } finally {
       setLoading(false);
     }

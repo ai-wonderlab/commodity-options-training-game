@@ -10,6 +10,10 @@ import PositionsTable from '../../../components/PositionsTable';
 import RiskMeters from '../../../components/RiskMeters';
 import Leaderboard from '../../../components/Leaderboard';
 import MarketData from '../../../components/MarketData';
+// Live components for production
+import MarketDataLive from '../../../components/MarketDataLive';
+import LeaderboardLive from '../../../components/LeaderboardLive';
+import { isSupabaseConfigured } from '../../../lib/supabaseClient';
 
 interface SessionData {
   session: any;
@@ -114,16 +118,20 @@ export default function SessionPage() {
 
   return (
     <div className="h-[calc(100vh-80px)] flex gap-4 p-4 bg-background">
-      {/* Left Panel - Futures & Option Chain */}
-      <div className="w-1/3 flex flex-col gap-4">
-        <MarketData ticks={Array.isArray(sessionData.ticksLatest) ? {} : sessionData.ticksLatest || {}} />
-        <div className="flex-1 min-h-0">
-          <OptionChain 
-            instruments={sessionData.session?.instruments || []}
-            ticks={Array.isArray(sessionData.ticksLatest) ? {} : sessionData.ticksLatest || {}}
-          />
+              {/* Left Panel - Futures & Option Chain */}
+        <div className="w-1/3 flex flex-col gap-4">
+          {isSupabaseConfigured() ? (
+            <MarketDataLive sessionId={sessionId} symbol="BRN" />
+          ) : (
+            <MarketData ticks={Array.isArray(sessionData.ticksLatest) ? {} : sessionData.ticksLatest || {}} />
+          )}
+          <div className="flex-1 min-h-0">
+            <OptionChain 
+              instruments={sessionData.session?.instruments || []}
+              ticks={Array.isArray(sessionData.ticksLatest) ? {} : sessionData.ticksLatest || {}}
+            />
+          </div>
         </div>
-      </div>
 
       {/* Center Panel - Trading & Portfolio */}
       <div className="flex-1 flex flex-col rounded-lg border bg-card shadow-soft overflow-hidden">
@@ -200,14 +208,21 @@ export default function SessionPage() {
         </div>
       </div>
 
-      {/* Right Panel - Leaderboard & Alerts */}
-      <div className="w-1/4 flex flex-col">
-        <Leaderboard 
-          leaderboard={sessionData.leaderboard}
-          participants={sessionData.participants}
-          currentParticipantId={currentParticipant?.id}
-        />
-      </div>
+              {/* Right Panel - Leaderboard & Alerts */}
+        <div className="w-1/4 flex flex-col">
+          {isSupabaseConfigured() ? (
+            <LeaderboardLive 
+              sessionId={sessionId}
+              currentParticipantId={currentParticipant?.id}
+            />
+          ) : (
+            <Leaderboard 
+              leaderboard={sessionData.leaderboard}
+              participants={sessionData.participants}
+              currentParticipantId={currentParticipant?.id}
+            />
+          )}
+        </div>
     </div>
   );
 }

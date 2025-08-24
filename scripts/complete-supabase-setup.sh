@@ -1,241 +1,181 @@
 #!/bin/bash
 
-# Complete Supabase Setup Script
+# Commodity Options Training Game - Complete Supabase Setup
 # This script automates the entire Supabase setup process
 
 set -e
+
+echo "🎮 Commodity Options Training Game - Production Setup"
+echo "======================================================="
+echo ""
 
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# ASCII Art Header
-echo -e "${BLUE}"
-echo "╔════════════════════════════════════════════════╗"
-echo "║     Commodity Options Training Game Setup      ║"
-echo "║              Supabase Configuration             ║"
-echo "╚════════════════════════════════════════════════╝"
-echo -e "${NC}"
-
-# Function to check if command exists
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
-}
-
-# Function to prompt for input
-prompt_input() {
-    local var_name=$1
-    local prompt_text=$2
-    local is_secret=$3
-    
-    if [ "$is_secret" = true ]; then
-        read -s -p "$prompt_text: " value
-        echo
+# Check if Supabase CLI is installed
+if ! command -v supabase &> /dev/null; then
+    echo -e "${YELLOW}Supabase CLI not found. Installing...${NC}"
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        brew install supabase/tap/supabase
     else
-        read -p "$prompt_text: " value
+        wget -qO- https://github.com/supabase/cli/releases/download/v1.187.10/supabase_linux_amd64.tar.gz | tar xvz
+        sudo mv supabase /usr/local/bin
     fi
-    
-    eval "$var_name='$value'"
-}
-
-# Check prerequisites
-echo -e "${YELLOW}📋 Checking prerequisites...${NC}"
-
-if ! command_exists node; then
-    echo -e "${RED}❌ Node.js is not installed${NC}"
-    echo "Please install Node.js 18+ from https://nodejs.org"
-    exit 1
 fi
 
-if ! command_exists npm; then
-    echo -e "${RED}❌ npm is not installed${NC}"
-    exit 1
-fi
+echo -e "${GREEN}✓ Supabase CLI installed${NC}"
+echo ""
 
-if ! command_exists supabase; then
-    echo -e "${YELLOW}📦 Installing Supabase CLI...${NC}"
-    npm install -g supabase
-fi
+# Step 1: Get Supabase credentials
+echo "📝 Step 1: Supabase Project Setup"
+echo "================================="
+echo ""
+echo "Please create a Supabase project at https://app.supabase.com"
+echo "IMPORTANT: Select EU (Frankfurt) region for compliance!"
+echo ""
+read -p "Enter your Supabase Project Reference ID: " PROJECT_REF
+read -p "Enter your Database Password: " -s DB_PASSWORD
+echo ""
+read -p "Enter your Supabase URL (https://xxx.supabase.co): " SUPABASE_URL
+read -p "Enter your Anon/Public Key: " SUPABASE_ANON_KEY
+read -p "Enter your Service Role Key: " -s SUPABASE_SERVICE_KEY
+echo ""
 
-echo -e "${GREEN}✅ All prerequisites met${NC}"
+# Step 2: Link project
+echo ""
+echo "🔗 Step 2: Linking Supabase Project..."
+echo "======================================"
+supabase link --project-ref $PROJECT_REF --password $DB_PASSWORD
 
-# Check if already logged in
-echo -e "${YELLOW}🔐 Checking Supabase authentication...${NC}"
-if ! supabase projects list >/dev/null 2>&1; then
-    echo -e "${YELLOW}Please login to Supabase${NC}"
-    supabase login
-fi
-
-# Project selection
-echo -e "${BLUE}═══════════════════════════════════════${NC}"
-echo -e "${YELLOW}🎯 Project Configuration${NC}"
-echo -e "${BLUE}═══════════════════════════════════════${NC}"
-
-echo -e "\nDo you want to:"
-echo "1) Create a new Supabase project"
-echo "2) Use an existing project"
-read -p "Select option (1 or 2): " project_option
-
-if [ "$project_option" = "1" ]; then
-    # Create new project
-    echo -e "${YELLOW}📝 Creating new Supabase project...${NC}"
-    
-    prompt_input PROJECT_NAME "Enter project name" false
-    prompt_input PROJECT_REGION "Enter region (eu-west-1, us-east-1, etc.)" false
-    prompt_input DB_PASSWORD "Enter database password (min 6 characters)" true
-    
-    echo -e "${YELLOW}Creating project...${NC}"
-    PROJECT_REF=$(supabase projects create "$PROJECT_NAME" \
-        --region "$PROJECT_REGION" \
-        --db-password "$DB_PASSWORD" \
-        --output json | jq -r '.ref')
-    
-    echo -e "${GREEN}✅ Project created: $PROJECT_REF${NC}"
-    
-    # Wait for project to be ready
-    echo -e "${YELLOW}⏳ Waiting for project to be ready (this may take a few minutes)...${NC}"
-    sleep 60
-    
-else
-    # Use existing project
-    echo -e "${YELLOW}📋 Available projects:${NC}"
-    supabase projects list
-    
-    prompt_input PROJECT_REF "Enter project reference ID" false
-fi
-
-# Link project
-echo -e "${YELLOW}🔗 Linking project...${NC}"
-supabase link --project-ref "$PROJECT_REF"
-
-# Get project details
-echo -e "${YELLOW}📊 Getting project details...${NC}"
-PROJECT_URL=$(supabase status --output json | jq -r '.API.URL')
-ANON_KEY=$(supabase status --output json | jq -r '.API.anon_key')
-SERVICE_KEY=$(supabase status --output json | jq -r '.API.service_key')
-
-# Push database schema
-echo -e "${BLUE}═══════════════════════════════════════${NC}"
-echo -e "${YELLOW}🗄️ Database Setup${NC}"
-echo -e "${BLUE}═══════════════════════════════════════${NC}"
-
-echo -e "${YELLOW}📤 Pushing database migrations...${NC}"
+# Step 3: Run migrations
+echo ""
+echo "🗄️ Step 3: Setting up Database..."
+echo "================================="
 supabase db push
 
-echo -e "${YELLOW}🌱 Seeding database...${NC}"
-if [ -f "supabase/seed.sql" ]; then
-    supabase db seed
-    echo -e "${GREEN}✅ Database seeded${NC}"
-else
-    echo -e "${YELLOW}⚠️ No seed file found, skipping...${NC}"
-fi
-
-# Deploy Edge Functions
-echo -e "${BLUE}═══════════════════════════════════════${NC}"
-echo -e "${YELLOW}⚡ Edge Functions${NC}"
-echo -e "${BLUE}═══════════════════════════════════════${NC}"
-
-echo -e "${YELLOW}📤 Deploying Edge Functions...${NC}"
-supabase functions deploy
-
-# Configure Authentication
-echo -e "${BLUE}═══════════════════════════════════════${NC}"
-echo -e "${YELLOW}🔐 Authentication Setup${NC}"
-echo -e "${BLUE}═══════════════════════════════════════${NC}"
-
-echo -e "${YELLOW}Configure OAuth providers in Supabase Dashboard:${NC}"
-echo -e "${BLUE}${PROJECT_URL}/project/${PROJECT_REF}/auth/providers${NC}"
+# Step 4: Enable Realtime
 echo ""
-echo "1. Enable Google Provider:"
-echo "   - Client ID: Get from Google Cloud Console"
-echo "   - Client Secret: Get from Google Cloud Console"
+echo "⚡ Step 4: Enabling Realtime..."
+echo "==============================="
+cat > /tmp/enable-realtime.sql << 'EOF'
+-- Enable Realtime for all game tables
+ALTER PUBLICATION supabase_realtime ADD TABLE sessions;
+ALTER PUBLICATION supabase_realtime ADD TABLE participants;
+ALTER PUBLICATION supabase_realtime ADD TABLE orders;
+ALTER PUBLICATION supabase_realtime ADD TABLE positions;
+ALTER PUBLICATION supabase_realtime ADD TABLE leaderboard;
+ALTER PUBLICATION supabase_realtime ADD TABLE ticks;
+ALTER PUBLICATION supabase_realtime ADD TABLE greek_snapshots;
+ALTER PUBLICATION supabase_realtime ADD TABLE breach_events;
+
+-- Create indexes for performance
+CREATE INDEX IF NOT EXISTS idx_orders_session_participant ON orders(session_id, participant_id);
+CREATE INDEX IF NOT EXISTS idx_positions_participant ON positions(participant_id);
+CREATE INDEX IF NOT EXISTS idx_ticks_latest ON ticks(symbol, ts DESC);
+EOF
+
+supabase db execute -f /tmp/enable-realtime.sql
+
+# Step 5: Deploy Edge Functions
 echo ""
-echo "2. Enable Microsoft Provider:"
-echo "   - Application ID: Get from Azure Portal"
-echo "   - Secret Value: Get from Azure Portal"
+echo "🚀 Step 5: Deploying Edge Functions..."
+echo "======================================"
+cd supabase/functions
+
+for func in session-create session-join session-state order-submit host-shock export-csv session-next-day session-update-status; do
+    if [ -d "$func" ]; then
+        echo "Deploying $func..."
+        supabase functions deploy $func --no-verify-jwt
+    fi
+done
+
+cd ../..
+
+# Step 6: Create environment file
 echo ""
-read -p "Press Enter when OAuth is configured..."
-
-# Create .env.local file
-echo -e "${BLUE}═══════════════════════════════════════${NC}"
-echo -e "${YELLOW}📝 Creating Environment File${NC}"
-echo -e "${BLUE}═══════════════════════════════════════${NC}"
-
-ENV_FILE="apps/web/.env.local"
-echo -e "${YELLOW}Creating $ENV_FILE...${NC}"
-
-cat > "$ENV_FILE" << EOF
+echo "🔧 Step 6: Creating Environment Configuration..."
+echo "=============================================="
+cat > apps/web/.env.local << EOF
 # Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=$PROJECT_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY=$SERVICE_KEY
+NEXT_PUBLIC_SUPABASE_URL=$SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_KEY
 
-# Project Reference
-SUPABASE_PROJECT_REF=$PROJECT_REF
+# App Configuration
+NEXT_PUBLIC_APP_NAME=Commodity Options Training Game
+NEXT_PUBLIC_APP_ENV=production
+NEXT_PUBLIC_APP_REGION=EU
+
+# Feature Flags
+NEXT_PUBLIC_ENABLE_AUTH=true
+NEXT_PUBLIC_ENABLE_REALTIME=true
+NEXT_PUBLIC_ENABLE_MOCK_DATA=false
 EOF
 
-echo -e "${GREEN}✅ Environment file created${NC}"
+echo -e "${GREEN}✓ Environment file created${NC}"
 
-# Test connection
-echo -e "${BLUE}═══════════════════════════════════════${NC}"
-echo -e "${YELLOW}🧪 Testing Connection${NC}"
-echo -e "${BLUE}═══════════════════════════════════════${NC}"
+# Step 7: Seed initial data
+echo ""
+echo "🌱 Step 7: Seeding Initial Data..."
+echo "================================="
+cat > /tmp/seed-data.sql << 'EOF'
+-- Insert default instruments
+INSERT INTO sessions (id, mode, instruments, bankroll, var_limit, data_source)
+VALUES (
+    'TEST-SESSION-' || extract(epoch from now())::text,
+    'live',
+    '[
+        {"symbol": "BRN", "type": "future", "name": "ICE Brent Futures"},
+        {"symbol": "BUL", "type": "option", "name": "ICE Brent Options"}
+    ]'::jsonb,
+    100000,
+    5000,
+    'mock'
+) ON CONFLICT DO NOTHING;
 
-echo -e "${YELLOW}Testing database connection...${NC}"
-if supabase db test >/dev/null 2>&1; then
-    echo -e "${GREEN}✅ Database connection successful${NC}"
+-- Insert sample tick data
+INSERT INTO ticks (ts, symbol, last, best_bid, best_ask, mid)
+VALUES 
+    (NOW(), 'BRN', 82.50, 82.45, 82.55, 82.50),
+    (NOW(), 'BUL-C-85-MAR', 2.35, 2.30, 2.40, 2.35),
+    (NOW(), 'BUL-P-80-MAR', 1.85, 1.80, 1.90, 1.85);
+EOF
+
+supabase db execute -f /tmp/seed-data.sql
+
+# Step 8: Test the setup
+echo ""
+echo "🧪 Step 8: Testing Setup..."
+echo "=========================="
+
+# Test database connection
+if supabase db remote list > /dev/null 2>&1; then
+    echo -e "${GREEN}✓ Database connection successful${NC}"
 else
-    echo -e "${RED}❌ Database connection failed${NC}"
+    echo -e "${RED}✗ Database connection failed${NC}"
+    exit 1
 fi
 
-# Final summary
-echo -e "${BLUE}═══════════════════════════════════════${NC}"
-echo -e "${GREEN}🎉 Setup Complete!${NC}"
-echo -e "${BLUE}═══════════════════════════════════════${NC}"
-
-echo -e "\n${GREEN}Your Supabase project is ready!${NC}"
-echo -e "\n${YELLOW}Project Details:${NC}"
-echo -e "  Project URL: ${BLUE}$PROJECT_URL${NC}"
-echo -e "  Project Ref: ${BLUE}$PROJECT_REF${NC}"
-echo -e "  Dashboard: ${BLUE}https://app.supabase.com/project/$PROJECT_REF${NC}"
-
-echo -e "\n${YELLOW}Next Steps:${NC}"
-echo -e "  1. Start the development server:"
-echo -e "     ${BLUE}npm run dev --workspace=@game/web${NC}"
-echo -e ""
-echo -e "  2. Open in browser:"
-echo -e "     ${BLUE}http://localhost:3000${NC}"
-echo -e ""
-echo -e "  3. Create a session as instructor:"
-echo -e "     ${BLUE}http://localhost:3000/instructor${NC}"
-
-echo -e "\n${YELLOW}Useful Commands:${NC}"
-echo -e "  View logs: ${BLUE}supabase functions logs${NC}"
-echo -e "  DB status: ${BLUE}supabase db status${NC}"
-echo -e "  Reset DB: ${BLUE}supabase db reset${NC}"
-
-echo -e "\n${GREEN}Happy Trading! 🚀${NC}"
-
-# Save configuration for future reference
-CONFIG_FILE=".supabase-config"
-echo -e "\n${YELLOW}Saving configuration to $CONFIG_FILE...${NC}"
-cat > "$CONFIG_FILE" << EOF
-PROJECT_REF=$PROJECT_REF
-PROJECT_URL=$PROJECT_URL
-SETUP_DATE=$(date)
-EOF
-
-echo -e "${GREEN}✅ Configuration saved${NC}"
-
-# Optional: Start the application
-echo -e "\n${YELLOW}Would you like to start the application now? (y/n)${NC}"
-read -p "> " start_app
-
-if [ "$start_app" = "y" ] || [ "$start_app" = "Y" ]; then
-    echo -e "${YELLOW}🚀 Starting application...${NC}"
-    cd apps/web
-    npm run dev
+# Test API endpoint
+if curl -s -o /dev/null -w "%{http_code}" "$SUPABASE_URL/rest/v1/sessions" \
+    -H "apikey: $SUPABASE_ANON_KEY" | grep -q "200"; then
+    echo -e "${GREEN}✓ API endpoint accessible${NC}"
+else
+    echo -e "${YELLOW}⚠ API endpoint test failed (might need auth setup)${NC}"
 fi
+
+echo ""
+echo "======================================"
+echo -e "${GREEN}🎉 SETUP COMPLETE!${NC}"
+echo "======================================"
+echo ""
+echo "Next steps:"
+echo "1. Configure OAuth providers in Supabase Dashboard"
+echo "2. Run: cd apps/web && npm run dev"
+echo "3. Visit: http://localhost:3000"
+echo ""
+echo "Supabase Dashboard: https://app.supabase.com/project/$PROJECT_REF"
+echo ""
