@@ -13,6 +13,8 @@ import MarketData from '../../../components/MarketData';
 // Live components for production
 import MarketDataLive from '../../../components/MarketDataLive';
 import LeaderboardLive from '../../../components/LeaderboardLive';
+import OrderTicketLive from '../../../components/OrderTicketLive';
+import PositionsTableLive from '../../../components/PositionsTableLive';
 import { isSupabaseConfigured } from '../../../lib/supabaseClient';
 
 interface SessionData {
@@ -181,19 +183,34 @@ export default function SessionPage() {
         </div>
         
         <div className="flex-1 p-6 overflow-auto">
-          {selectedTab === 'ticket' && (
-            <OrderTicket 
-              sessionId={sessionId}
-              participantId={currentParticipant?.id}
-              onOrderSubmitted={fetchSessionState}
-            />
-          )}
-          {selectedTab === 'positions' && (
-            <PositionsTable 
-              positions={sessionData.positions.filter(p => p.participant_id === currentParticipant?.id)}
-              currentPrices={Array.isArray(sessionData.ticksLatest) ? sessionData.ticksLatest : []}
-            />
-          )}
+                      {selectedTab === 'ticket' && (
+              isSupabaseConfigured() ? (
+                <OrderTicketLive 
+                  sessionId={sessionId}
+                  participantId={currentParticipant?.id}
+                  onOrderSubmitted={fetchSessionState}
+                />
+              ) : (
+                <OrderTicket 
+                  sessionId={sessionId}
+                  participantId={currentParticipant?.id}
+                  onOrderSubmitted={fetchSessionState}
+                />
+              )
+            )}
+            {selectedTab === 'positions' && (
+              isSupabaseConfigured() ? (
+                <PositionsTableLive 
+                  participantId={currentParticipant?.id}
+                  sessionId={sessionId}
+                />
+              ) : (
+                <PositionsTable 
+                  positions={sessionData.positions.filter(p => p.participant_id === currentParticipant?.id)}
+                  currentPrices={Array.isArray(sessionData.ticksLatest) ? sessionData.ticksLatest : []}
+                />
+              )
+            )}
           {selectedTab === 'risk' && (
             <RiskMeters 
               participantId={currentParticipant?.id}

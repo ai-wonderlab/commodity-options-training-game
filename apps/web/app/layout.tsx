@@ -2,6 +2,8 @@ import './globals.css';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from '../components/AuthProvider';
 import AuthButton from '../components/AuthButton';
+import AuthButtonEnhanced from '../components/AuthButtonEnhanced';
+import { isSupabaseConfigured } from '../lib/supabaseClient';
 import QuickNav from '../components/QuickNav';
 import ComplianceBanner from '../components/ComplianceBanner';
 
@@ -31,9 +33,11 @@ export default function RootLayout({
                       Education only • ICE Brent (BRN) & Options (BUL) • 15-min delayed • EU region only
                     </p>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <AuthButton />
-                  </div>
+                                <div className="flex items-center gap-4">
+                <div id="auth-button">
+                  {isSupabaseConfigured() ? <AuthButtonEnhanced /> : <AuthButton />}
+                </div>
+              </div>
                 </div>
               </div>
             </header>
