@@ -1,0 +1,13 @@
+{
+  "buildCommand": "npm run build --workspaces",
+  "outputDirectory": "apps/web/.next",
+  "framework": "nextjs",
+  "installCommand": "npm install",
+  "devCommand": "npm run dev --workspace=@game/web",
+  "regions": ["fra1"],
+  "functions": {
+    "apps/web/app/api/**/*": {
+      "maxDuration": 10
+    }
+  }
+}
