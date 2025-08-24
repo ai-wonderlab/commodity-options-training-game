@@ -7,7 +7,7 @@ import {
   Activity,
   AlertCircle,
   Percent,
-  TrendingFlat
+  Minus
 } from 'lucide-react';
 import { cn, cardStyles, formatCurrency, formatNumber, getPriceColorClass } from '../lib/utils';
 import { 
@@ -331,7 +331,7 @@ export default function PositionsTableLive({ participantId, sessionId }: Positio
       <div className={cn(cardStyles.base, "overflow-hidden")}>
         <div className={cardStyles.content}>
           <div className="text-center py-8">
-            <TrendingFlat className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+            <Minus className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
             <p className="text-body text-muted-foreground">No open positions</p>
             <p className="text-caption text-muted-foreground mt-1">Place an order to get started</p>
           </div>
